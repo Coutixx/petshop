@@ -1,8 +1,8 @@
 ﻿import { describe, expect, it } from 'vitest'
-import { CarrinhoService } from '../../src/services/CarrinhoService'
-import { FreteService } from '../../src/services/FreteService'
-import { CheckoutService } from '../../src/services/CheckoutService'
-import { EntregadorService } from '../../src/services/EntregadorService'
+import { EntregadorService } from '../../src/main/modules/entregadores/entregador-service'
+import { CarrinhoService } from '../../src/main/modules/pedidos/carrinho-service'
+import { CheckoutService } from '../../src/main/modules/pedidos/checkout-service'
+import { FreteService } from '../../src/main/modules/pedidos/frete-service'
 
 describe('CarrinhoService', () => {
   it('adiciona produtos e calcula o subtotal', () => {
