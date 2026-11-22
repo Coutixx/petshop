@@ -109,6 +109,26 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 - [x] **[Enzo]** Tratar falha de envio de e-mail sem invalidar a venda.
 - [ ] **[Enzo]** Revisar PRs das funcionalidades da equipe.
 
+## Estado atual da integração
+
+As funcionalidades abaixo foram reorganizadas para seguir as camadas do projeto. Elas **ainda não estão na `develop`**: aguardam revisão e merge pelos Pull Requests.
+
+| Módulo | Pull Request | Situação | Estrutura entregue |
+| --- | --- | --- | --- |
+| Checkout e entregadores | [#7](https://github.com/Coutixx/petshop/pull/7) | Aguardando revisão | `src/main/modules/pedidos` e `src/main/modules/entregadores` |
+| Recibos e histórico | [#8](https://github.com/Coutixx/petshop/pull/8) | Aguardando revisão | `src/renderer/src/modules/historico` e `src/shared/domain` |
+
+Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge deles.
+
+### Próximos passos
+
+1. Revisar o diff e os checks do [#7](https://github.com/Coutixx/petshop/pull/7); se aprovado, fazer merge em `develop`.
+2. Atualizar a `develop`, revisar o [#8](https://github.com/Coutixx/petshop/pull/8) e fazer merge em `develop`.
+3. Atualizar a cópia local com `git switch develop` e `git pull --ff-only origin develop`.
+4. Iniciar a Fase 6 somente depois dos dois módulos estarem integrados. O checkout ainda usa mocks; a ligação com MySQL, IPC e a confirmação real de pedidos continuam pendentes.
+
+> Nunca envie código diretamente para `develop`. A integração deve ocorrer pelo botão **Merge pull request** após revisão.
+
 ### Fase 6 - Integração planejada (somente quando os módulos isolados estiverem prontos)
 
 - [ ] **[Henrique]** Criar/adaptar repositórios MySQL para `Produto`, `Entregador`, `Pedido` e `ItemPedido` a partir dos contratos entregues.
