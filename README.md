@@ -91,13 +91,13 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 
 ### Fase 4 - Módulo do Nycollas: entregadores, pedido e frete
 
-- [ ] **[Nycollas]** Criar interface `Entregador` e CRUD com dados de exemplo.
-- [ ] **[Nycollas]** Criar `PedidoRascunho` usando IDs e dados simulados de cliente/produto.
-- [ ] **[Nycollas]** Implementar tela de checkout com carrinho local e cálculo de subtotal.
+- [x] **[Nycollas]** Criar interface `Entregador` e CRUD com dados de exemplo.
+- [x] **[Nycollas]** Criar `PedidoRascunho` usando IDs e dados simulados de cliente/produto.
+- [ ] **[Nycollas]** Implementar tela de checkout com carrinho local e cálculo de subtotal. As regras de carrinho e subtotal estão prontas; falta a tela Electron.
 - [ ] **[Nycollas]** Integrar API de distância usando origem/destino de teste.
-- [ ] **[Nycollas]** Definir e testar regra de cálculo de frete de forma isolada.
-- [ ] **[Nycollas]** Registrar datas de criação/entrega no rascunho do pedido.
-- [ ] **[Nycollas]** Criar testes para total, frete, checkout vazio e falha da API.
+- [x] **[Nycollas]** Definir e testar regra de cálculo de frete de forma isolada.
+- [ ] **[Nycollas]** Registrar datas de criação/entrega no rascunho do pedido. A criação é registrada; falta definir a previsão de entrega.
+- [ ] **[Nycollas]** Criar testes para total, frete, checkout vazio e falha da API. Total, frete e carrinho vazio estão cobertos; falta a falha da API de distância.
 
 ### Fase 5 - Módulo do Enzo: itens, confirmação e histórico
 
