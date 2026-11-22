@@ -65,7 +65,7 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 - [x] **[Henrique]** Configurar credenciais MySQL locais e validar conexão com o servidor da escola.
 - [ ] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
 - [ ] **[Nycollas]** Criar wireframe e tela estática do caixa/checkout com dados simulados.
-- [x] **[Enzo]** Criar [modelo visual de recibo e histórico](prototipos/enzo/index.html) usando dados simulados.
+- [x] **[Enzo]** Criar [modelo visual de recibo e histórico](src/renderer/src/modules/historico/prototype/index.html) usando dados simulados.
 
 ### Fase 2 - Módulo do Henrique: backend, banco e clientes
 
@@ -103,10 +103,10 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 
 - [x] **[Enzo]** Criar interface `ItemPedido` e funções de subtotal/total usando dados de exemplo.
 - [x] **[Enzo]** Garantir que o item preserve preço unitário e quantidade da venda.
-- [ ] **[Enzo]** Criar recibo visual com um pedido simulado.
-- [ ] **[Enzo]** Criar tela de histórico com pedidos simulados.
-- [ ] **[Enzo]** Implementar serviço de e-mail com ambiente de teste ou mock, sem credenciais no código.
-- [ ] **[Enzo]** Tratar falha de envio de e-mail sem invalidar a venda.
+- [x] **[Enzo]** Criar recibo visual com um pedido simulado.
+- [x] **[Enzo]** Criar tela de histórico com pedidos simulados.
+- [x] **[Enzo]** Implementar serviço de e-mail com ambiente de teste ou mock, sem credenciais no código.
+- [x] **[Enzo]** Tratar falha de envio de e-mail sem invalidar a venda.
 - [ ] **[Enzo]** Revisar PRs das funcionalidades da equipe.
 
 ### Fase 6 - Integração planejada (somente quando os módulos isolados estiverem prontos)
