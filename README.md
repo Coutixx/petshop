@@ -111,21 +111,20 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 
 ## Estado atual da integração
 
-As funcionalidades abaixo foram reorganizadas para seguir as camadas do projeto. Elas **ainda não estão na `develop`**: aguardam revisão e merge pelos Pull Requests.
+As funcionalidades abaixo foram reorganizadas para seguir as camadas do projeto e já foram integradas na `develop`.
 
 | Módulo | Pull Request | Situação | Estrutura entregue |
 | --- | --- | --- | --- |
-| Checkout e entregadores | [#7](https://github.com/Coutixx/petshop/pull/7) | Aguardando revisão | `src/main/modules/pedidos` e `src/main/modules/entregadores` |
-| Recibos e histórico | [#8](https://github.com/Coutixx/petshop/pull/8) | Aguardando revisão | `src/renderer/src/modules/historico` e `src/shared/domain` |
+| Checkout e entregadores | [#7](https://github.com/Coutixx/petshop/pull/7) | Integrado | `src/main/modules/pedidos` e `src/main/modules/entregadores` |
+| Recibos e histórico | [#8](https://github.com/Coutixx/petshop/pull/8) | Integrado | `src/renderer/src/modules/historico` e `src/shared/domain` |
 
 Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge deles.
 
 ### Próximos passos
 
-1. Revisar o diff e os checks do [#7](https://github.com/Coutixx/petshop/pull/7); se aprovado, fazer merge em `develop`.
-2. Atualizar a `develop`, revisar o [#8](https://github.com/Coutixx/petshop/pull/8) e fazer merge em `develop`.
-3. Atualizar a cópia local com `git switch develop` e `git pull --ff-only origin develop`.
-4. Iniciar a Fase 6 somente depois dos dois módulos estarem integrados. O checkout ainda usa mocks; a ligação com MySQL, IPC e a confirmação real de pedidos continuam pendentes.
+1. Atualizar a cópia local com `git switch develop` e `git pull --ff-only origin develop`.
+2. Iniciar a Fase 6. O checkout ainda usa mocks; a ligação com MySQL, IPC e a confirmação real de pedidos continuam pendentes.
+3. Executar o fluxo integrado completo antes de preparar a release.
 
 > Nunca envie código diretamente para `develop`. A integração deve ocorrer pelo botão **Merge pull request** após revisão.
 
