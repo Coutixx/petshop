@@ -85,7 +85,7 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 - [ ] **[Julia]** Implementar tela e CRUD de produtos com dados de exemplo.
 - [x] **[Julia]** Implementar categoria, preço em BRL, preço em USD, importado e quantidade em estoque.
 - [ ] **[Julia]** Integrar cotação do dólar com tratamento de falha da API.
-- [ ] **[Julia]** Implementar regra local que identifica produto indisponível quando o estoque for zero.
+- [x] **[Julia]** Implementar regra local que identifica produto indisponível quando o estoque for zero.
 - [ ] **[Julia]** Criar dashboard de produtos e indicadores de estoque.
 - [ ] **[Julia]** Criar dados de demonstração e testes do módulo de produtos.
 
