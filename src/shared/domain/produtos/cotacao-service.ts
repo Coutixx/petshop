@@ -13,7 +13,8 @@ export interface ResultadoCotacao {
 export class CotacaoService {
   private ultima: Cotacao | null = null
 
-  constructor(private readonly consultar: typeof fetch = fetch) {}
+  // A função nativa do navegador não pode receber o serviço como `this`.
+  constructor(private readonly consultar: typeof fetch = (input, init) => fetch(input, init)) {}
 
   async atualizar(): Promise<ResultadoCotacao> {
     try {

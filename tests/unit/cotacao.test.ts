@@ -1,10 +1,20 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CotacaoService } from '../../src/shared/domain/produtos/cotacao-service'
 
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status })
 const valido = { USDBRL: { code: 'USD', codein: 'BRL', bid: '5.10', ask: '5.1234', timestamp: '1700000000' } }
 
 describe('cotação pública USD/BRL', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('consulta pelo adaptador padrão sem passar o serviço como contexto ao fetch nativo', async () => {
+    vi.stubGlobal('fetch', function (this: unknown) {
+      if (this instanceof CotacaoService) throw new TypeError('Illegal invocation')
+      return Promise.resolve(response(valido))
+    })
+    expect((await new CotacaoService().atualizar()).cotacao?.taxa).toBe(5.1234)
+  })
+
   it('usa a taxa de venda e o horário do provedor com prazo limite de consulta', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response(valido))
     const resultado = await new CotacaoService(fetcher).atualizar()
