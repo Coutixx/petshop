@@ -86,7 +86,7 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 - [x] **[Julia]** Implementar categoria, preço em BRL, preço em USD, importado e quantidade em estoque.
 - [x] **[Julia]** Integrar cotação do dólar com tratamento de falha da API.
 - [x] **[Julia]** Implementar regra local que identifica produto indisponível quando o estoque for zero.
-- [ ] **[Julia]** Criar dashboard de produtos e indicadores de estoque.
+- [x] **[Julia]** Criar dashboard de produtos e indicadores de estoque.
 - [ ] **[Julia]** Criar dados de demonstração e testes do módulo de produtos.
 
 ### Fase 4 - Módulo do Nycollas: entregadores, pedido e frete
