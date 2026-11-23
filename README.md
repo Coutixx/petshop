@@ -63,7 +63,7 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 - [x] **[Henrique]** Configurar scripts de desenvolvimento, build, lint, testes, CSP e `contextIsolation`.
 - [x] **[Henrique]** Definir contratos TypeScript compartilhados (`ClienteResumo`, `ProdutoResumo`, `PedidoRascunho`) sem implementar telas de terceiros.
 - [x] **[Henrique]** Configurar credenciais MySQL locais e validar conexão com o servidor da escola.
-- [ ] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
+- [x] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
 - [ ] **[Nycollas]** Criar wireframe e tela estática do caixa/checkout com dados simulados.
 - [x] **[Enzo]** Criar [modelo visual de recibo e histórico](src/renderer/src/modules/historico/prototype/index.html) usando dados simulados.
 
