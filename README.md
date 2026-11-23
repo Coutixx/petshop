@@ -109,7 +109,7 @@ Para o checkout, aplique também `database/migrations/002-entregadores.sql` apó
 - [x] **[Enzo]** Criar tela de histórico com pedidos simulados.
 - [x] **[Enzo]** Implementar serviço de e-mail com ambiente de teste ou mock, sem credenciais no código.
 - [x] **[Enzo]** Tratar falha de envio de e-mail sem invalidar a venda.
-- [ ] **[Enzo]** Revisar PRs das funcionalidades da equipe.
+- [x] **[Enzo]** Revisar PRs das funcionalidades da equipe.
 
 ## Estado atual da integração
 
