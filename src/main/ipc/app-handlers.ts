@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron'
-import type { ClienteInput, UsuarioAutenticado } from '../../shared/contracts'
+import type { ClienteInput, CriarPedidoInput, EntregadorInput, UsuarioAutenticado } from '../../shared/contracts'
 import { testMySqlConnection } from '../database/connection'
 import { MySqlClienteRepository } from '../modules/clientes/cliente-repository'
 import { ClienteNaoEncontradoError, ClienteService, EntradaInvalidaError } from '../modules/clientes/cliente-service'
@@ -7,6 +7,11 @@ import { exigirAdmin, exigirLogin, NaoAutorizadoError } from '../modules/usuario
 import { MySqlUsuarioRepository } from '../modules/usuarios/usuario-repository'
 import { CredenciaisInvalidasError, UsuarioService } from '../modules/usuarios/usuario-service'
 import { ViaCepError, ViaCepService } from '../modules/viacep/viacep-service'
+import { DistanceApiError, DistanceService } from '../../services/DistanceService'
+import { ProdutoRepository } from '../modules/produtos/produto-repository'
+import { EntregadorPersistenceService, EntregadorEntradaInvalidaError, EntregadorNaoEncontradoError } from '../modules/entregadores/entregador-persistence-service'
+import { PedidoEntradaInvalidaError, PedidoService } from '../modules/pedidos/pedido-service'
+import { PedidoOperacaoError } from '../modules/pedidos/pedido-errors'
 
 type SafeHandler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown
 
@@ -14,6 +19,10 @@ export function registerAppHandlers(): void {
   const usuarioService = new UsuarioService(new MySqlUsuarioRepository())
   const clienteService = new ClienteService(new MySqlClienteRepository())
   const viaCepService = new ViaCepService()
+  const distanceService = new DistanceService()
+  const produtoRepository = new ProdutoRepository()
+  const entregadorService = new EntregadorPersistenceService()
+  const pedidoService = new PedidoService()
   let usuarioAtual: UsuarioAutenticado | null = null
 
   ipcMain.handle('app:get-version', () => app.getVersion())
@@ -63,6 +72,34 @@ export function registerAppHandlers(): void {
     exigirLogin(usuarioAtual)
     return viaCepService.consultar(typeof cep === 'string' ? cep : '')
   })
+  handleSafely('distancia:calcular', (_event, destino) => {
+    exigirLogin(usuarioAtual)
+    return distanceService.calcularRotaPorEndereco(typeof destino === 'string' ? destino : '')
+  })
+  handleSafely('produtos:listar', () => {
+    exigirLogin(usuarioAtual)
+    return produtoRepository.listarDisponiveis()
+  })
+  handleSafely('entregadores:listar', () => {
+    exigirLogin(usuarioAtual)
+    return entregadorService.listar()
+  })
+  handleSafely('entregadores:criar', (_event, input) => {
+    exigirLogin(usuarioAtual)
+    return entregadorService.criar(input as EntregadorInput)
+  })
+  handleSafely('entregadores:atualizar', (_event, id, input) => {
+    exigirLogin(usuarioAtual)
+    return entregadorService.atualizar(typeof id === 'number' ? id : Number.NaN, input as EntregadorInput)
+  })
+  handleSafely('entregadores:excluir', (_event, id) => {
+    exigirAdmin(usuarioAtual)
+    return entregadorService.excluir(typeof id === 'number' ? id : Number.NaN)
+  })
+  handleSafely('pedidos:criar', (_event, input) => {
+    exigirLogin(usuarioAtual)
+    return pedidoService.criar(input as CriarPedidoInput)
+  })
 }
 
 function handleSafely(channel: string, handler: SafeHandler): void {
@@ -73,7 +110,10 @@ function handleSafely(channel: string, handler: SafeHandler): void {
       if (
         error instanceof EntradaInvalidaError || error instanceof ClienteNaoEncontradoError ||
         error instanceof CredenciaisInvalidasError || error instanceof ViaCepError ||
-        error instanceof NaoAutorizadoError
+        error instanceof NaoAutorizadoError || error instanceof DistanceApiError
+        || error instanceof EntregadorEntradaInvalidaError || error instanceof EntregadorNaoEncontradoError
+        || error instanceof PedidoEntradaInvalidaError
+        || error instanceof PedidoOperacaoError
       ) {
         throw new Error(error.message)
       }

@@ -1,4 +1,7 @@
-As migrations MySQL ficam ordenadas pelo prefixo numérico. `001-inicial.sql` cria as seis tabelas base; aplique-a uma vez no banco da equipe antes de executar o seed.
+As migrations MySQL ficam ordenadas pelo prefixo numérico. `001-inicial.sql` cria as seis tabelas base; aplique-a uma vez no banco da equipe antes de executar o seed. O checkout também exige `002-entregadores.sql`; consulte [configuração do checkout](002-entregadores.md).
+
+- Aplique `001-inicial.sql` uma vez para criar as seis tabelas base.
+- Aplique `002-entregadores.sql` para adicionar veículo e disponibilidade ao cadastro.
 
 ```mermaid
 erDiagram
@@ -15,4 +18,4 @@ Chaves estrangeiras:
 - `itens_pedido.pedido_id` referencia `pedidos.id`; os itens são removidos junto com o pedido.
 - `itens_pedido.produto_id` referencia `produtos.id`.
 
-`usuarios` e `clientes` são os únicos módulos com repositórios e APIs nesta fase. As tabelas `produtos`, `entregadores`, `pedidos` e `itens_pedido` preparam o schema para as fases seguintes, sem handlers públicos nesta entrega.
+`usuarios`, `clientes`, `produtos`, `entregadores` e `pedidos` possuem handlers IPC. O checkout grava pedido e itens, atualiza estoque e reserva o entregador escolhido na mesma transação.
