@@ -81,7 +81,7 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 
 ### Fase 3 - Módulo da Julia: produtos e estoque
 
-- [ ] **[Julia]** Criar interface `Produto`, serviço e repositório local/mocado para desenvolvimento isolado.
+- [x] **[Julia]** Criar interface `Produto`, serviço e repositório local/mocado para desenvolvimento isolado.
 - [ ] **[Julia]** Implementar tela e CRUD de produtos com dados de exemplo.
 - [ ] **[Julia]** Implementar categoria, preço em BRL, preço em USD, importado e quantidade em estoque.
 - [ ] **[Julia]** Integrar cotação do dólar com tratamento de falha da API.
