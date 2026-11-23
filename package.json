@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "prototype:historico": "vite src/renderer/src/modules/historico/prototype",
+    "prototype:produtos": "vite src/renderer/src/modules/produtos/prototype --host 127.0.0.1 --port 5174 --strictPort",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
