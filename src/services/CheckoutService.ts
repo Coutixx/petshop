@@ -77,12 +77,16 @@ export class CheckoutService {
             })),
             frete: valores.frete,
             criadoEm: new Date().toISOString(),
-            previsaoEntrega: null
+            previsaoEntrega: new Date(Date.now() + 60 * 60 * 1000).toISOString()
         };
     }
 
     removerProduto(produtoId: number): boolean {
         return this.carrinhoService.removerItem(produtoId);
+    }
+
+    ajustarQuantidade(produtoId: number, delta: number): boolean {
+        return this.carrinhoService.ajustarQuantidade(produtoId, delta);
     }
 
     listarItens() {

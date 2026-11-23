@@ -50,6 +50,16 @@ export class CarrinhoService {
         return true;
     }
 
+    ajustarQuantidade(produtoId: number, delta: number): boolean {
+        if (!Number.isInteger(delta) || delta === 0) return false;
+        const item = this.itens.find(candidato => candidato.produtoId === produtoId);
+        if (!item) return false;
+        const quantidade = item.quantidade + delta;
+        if (quantidade <= 0) return this.removerItem(produtoId);
+        item.quantidade = quantidade;
+        return true;
+    }
+
     calcularSubtotal(): number {
         const subtotal = this.itens.reduce(
             (total, item) => total + item.precoUnitario * item.quantidade,

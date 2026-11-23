@@ -1,7 +1,1 @@
-export interface Entregador {
-    id: number;
-    nome: string;
-    telefone: string;
-    veiculo: string;
-    disponivel: boolean;
-}
+export type { EntregadorResumo as Entregador, EntregadorInput } from '../shared/contracts'

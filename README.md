@@ -46,6 +46,8 @@ Depois que a migration e o seed terminarem com sucesso, execute `npm run dev` e 
 
 O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dentro do instalador. Cada integrante precisa usar suas próprias credenciais, a menos que o professor forneça uma conta específica para o projeto.
 
+Para o checkout, aplique também `database/migrations/002-entregadores.sql` após `001-inicial.sql` e defina `STORE_ADDRESS` no `.env` com o endereço real da loja. A consulta geocodifica esse endereço e o endereço cadastrado do cliente para calcular a rota.
+
 ## Divisão da equipe
 
 | Integrante | Módulo independente | Entrega na integração |
@@ -91,13 +93,13 @@ O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dent
 
 ### Fase 4 - Módulo do Nycollas: entregadores, pedido e frete
 
-- [ ] **[Nycollas]** Criar interface `Entregador` e CRUD com dados de exemplo.
-- [ ] **[Nycollas]** Criar `PedidoRascunho` usando IDs e dados simulados de cliente/produto.
-- [ ] **[Nycollas]** Implementar tela de checkout com carrinho local e cálculo de subtotal.
-- [ ] **[Nycollas]** Integrar API de distância usando origem/destino de teste.
-- [ ] **[Nycollas]** Definir e testar regra de cálculo de frete de forma isolada.
-- [ ] **[Nycollas]** Registrar datas de criação/entrega no rascunho do pedido.
-- [ ] **[Nycollas]** Criar testes para total, frete, checkout vazio e falha da API.
+- [x] **[Nycollas]** Criar interface `Entregador` e CRUD com dados de exemplo e MySQL.
+- [x] **[Nycollas]** Criar `PedidoRascunho` usando IDs de cliente e produto.
+- [x] **[Nycollas]** Implementar tela de checkout com carrinho local e cálculo de subtotal.
+- [x] **[Nycollas]** Integrar API de distância com origem configurada e endereço real do cliente.
+- [x] **[Nycollas]** Definir e testar regra de cálculo de frete de forma isolada.
+- [x] **[Nycollas]** Registrar datas de criação e previsão de entrega.
+- [x] **[Nycollas]** Criar testes para total, frete, checkout vazio e falha da API.
 
 ### Fase 5 - Módulo do Enzo: itens, confirmação e histórico
 
@@ -132,10 +134,10 @@ Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge del
 
 - [ ] **[Henrique]** Criar/adaptar repositórios MySQL para `Produto`, `Entregador`, `Pedido` e `ItemPedido` a partir dos contratos entregues.
 - [ ] **[Julia]** Substituir os dados de exemplo de produtos pela API IPC fornecida por Henrique.
-- [ ] **[Nycollas]** Substituir os dados simulados de cliente, produto e entregador pelas APIs IPC; conectar o checkout ao pedido real.
+- [x] **[Nycollas]** Substituir os dados simulados de cliente, produto e entregador pelas APIs IPC; conectar o checkout ao pedido real.
 - [ ] **[Enzo]** Conectar itens, recibo, histórico e e-mail ao pedido confirmado.
 - [ ] **[Julia]** Conectar a validação de estoque ao fechamento da venda.
-- [ ] **[Nycollas]** Conectar o cálculo de frete/distância ao total final do pedido.
+- [x] **[Nycollas]** Conectar o cálculo de frete/distância ao total final do pedido.
 - [ ] **[Henrique]** Validar transação de venda: gravar pedido, gravar itens e baixar estoque de forma atômica.
 - [ ] **[Todos]** Executar um fluxo integrado: login -> cliente -> produto -> checkout -> frete -> confirmação -> recibo/histórico.
 

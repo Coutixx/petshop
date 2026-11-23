@@ -1,0 +1,3 @@
+ALTER TABLE entregadores
+  ADD COLUMN veiculo VARCHAR(40) NOT NULL DEFAULT 'Moto' AFTER telefone,
+  ADD COLUMN disponivel BOOLEAN NOT NULL DEFAULT TRUE AFTER veiculo;

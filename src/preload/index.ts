@@ -11,7 +11,14 @@ const api: DesktopApi = {
   criarCliente: (input) => ipcRenderer.invoke('clientes:criar', input),
   atualizarCliente: (id, input) => ipcRenderer.invoke('clientes:atualizar', id, input),
   excluirCliente: (id) => ipcRenderer.invoke('clientes:excluir', id),
-  consultarCep: (cep) => ipcRenderer.invoke('viacep:consultar', cep)
+  consultarCep: (cep) => ipcRenderer.invoke('viacep:consultar', cep),
+  listarProdutos: () => ipcRenderer.invoke('produtos:listar'),
+  listarEntregadores: () => ipcRenderer.invoke('entregadores:listar'),
+  criarEntregador: (input) => ipcRenderer.invoke('entregadores:criar', input),
+  atualizarEntregador: (id, input) => ipcRenderer.invoke('entregadores:atualizar', id, input),
+  excluirEntregador: (id) => ipcRenderer.invoke('entregadores:excluir', id),
+  calcularDistancia: (destino) => ipcRenderer.invoke('distancia:calcular', destino),
+  criarPedido: (input) => ipcRenderer.invoke('pedidos:criar', input)
 }
 
 contextBridge.exposeInMainWorld('petShop', api)

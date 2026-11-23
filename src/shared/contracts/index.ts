@@ -41,8 +41,29 @@ export interface EnderecoViaCep {
 export interface ProdutoResumo {
   id: number
   nome: string
+  categoria?: string
   preco: number
   disponivel: boolean
+}
+
+export interface EntregadorResumo {
+  id: number
+  nome: string
+  telefone: string
+  veiculo: string
+  disponivel: boolean
+}
+
+export type EntregadorInput = Omit<EntregadorResumo, 'id'>
+
+export interface Coordenadas {
+  latitude: number
+  longitude: number
+}
+
+export interface RotaCalculada {
+  distanciaKm: number
+  duracaoMinutos: number
 }
 
 export interface ItemPedidoRascunho {
@@ -59,6 +80,20 @@ export interface PedidoRascunho {
   previsaoEntrega: string | null
 }
 
+export interface CriarPedidoInput {
+  clienteId: number
+  entregadorId: number | null
+  itens: ItemPedidoRascunho[]
+  distanciaKm: number
+  duracaoMinutos: number
+}
+
+export interface PedidoRegistrado extends PedidoRascunho {
+  id: number
+  subtotal: number
+  total: number
+}
+
 export interface DesktopApi {
   getAppVersion(): Promise<string>
   testDatabaseConnection(): Promise<DatabaseConnectionTestResult>
@@ -70,6 +105,13 @@ export interface DesktopApi {
   atualizarCliente(id: number, input: ClienteInput): Promise<Cliente>
   excluirCliente(id: number): Promise<void>
   consultarCep(cep: string): Promise<EnderecoViaCep>
+  listarProdutos(): Promise<ProdutoResumo[]>
+  listarEntregadores(): Promise<EntregadorResumo[]>
+  criarEntregador(input: EntregadorInput): Promise<EntregadorResumo>
+  atualizarEntregador(id: number, input: EntregadorInput): Promise<EntregadorResumo>
+  excluirEntregador(id: number): Promise<void>
+  calcularDistancia(destino: string): Promise<RotaCalculada>
+  criarPedido(input: CriarPedidoInput): Promise<PedidoRegistrado>
 }
 
 export interface DatabaseConnectionTestResult {
