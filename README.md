@@ -56,7 +56,11 @@ Cada produto mantém seu preço na moeda de origem (BRL ou USD); a marcação de
 
 As regras estão em `src/shared/domain/produtos`; a interface está em `src/renderer/src/modules/produtos`. `ProdutoService.listarResumos(taxa)` entrega o contrato `ProdutoResumo` com preços em BRL, omitindo itens em USD quando não há taxa válida. `validarDisponibilidade(itens)` verifica a soma das quantidades por produto sem baixar estoque. Antes do uso real, Henrique deve fornecer persistência/API IPC com autorização, e Nycollas deve conectar a validação ao checkout. A confirmação deverá revalidar e baixar o estoque em uma transação MySQL atômica. Recibos e histórico devem usar o preço confirmado da venda, não recalcular com uma cotação posterior.
 
-Validação: `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`. Os testes de interface usam happy-dom, com confirmação de exclusão simulada; a validação HTML nativa e a conferência visual do Electron precisam ser verificadas no desktop. Nenhuma migration ou seed é necessária para a demonstração de produtos.
+Para conferir visualmente só este módulo no navegador, execute `npm run prototype:produtos` e abra `http://127.0.0.1:5174`. A prévia usa o mesmo componente do Electron, sem simular APIs de clientes ou autenticação. O armazenamento de cada navegador/perfil é independente do Electron. A exclusão pede confirmação dentro da tela, com opções de cancelar e confirmar.
+
+Validação: `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`. Os testes de interface usam happy-dom; a validação HTML nativa é simulada nesses testes e também pode ser conferida na prévia real. Nenhuma migration ou seed é necessária para a demonstração de produtos.
+
+Se o Electron compilar e encerrar antes de abrir uma janela em um terminal restrito de automação, tente `npm run dev` no PowerShell normal do Windows, a partir da pasta do projeto. Isso não exige alterar o MySQL ou desativar a segurança do Electron. Se a instalação informar `Electron uninstall`, confirme que o download do binário foi permitido pelo npm e execute o instalador oficial local com `node node_modules/electron/install.js` antes de tentar novamente.
 
 ## Divisão da equipe
 
@@ -154,7 +158,7 @@ Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge del
 ### Fase 7 - Entrega
 
 - [ ] **[Henrique]** Preparar banco com dados de demonstração e gerar build testável.
-- [ ] **[Julia]** Revisar consistência visual e navegação.
+- [x] **[Julia]** Revisar consistência visual e navegação.
 - [ ] **[Nycollas]** Revisar regras de pedido, frete e mensagens do checkout.
 - [ ] **[Enzo]** Atualizar documentação de instalação, uso e histórico de decisões.
 - [ ] **[Todos]** Revisar segurança, testes, checklist e Pull Requests.
