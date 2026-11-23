@@ -1,5 +1,8 @@
 import 'bootstrap/dist/css/bootstrap.min.css'
+import { iniciarCatalogo } from './modules/produtos/catalogo'
 import type { Cliente, ClienteInput, UsuarioAutenticado } from '../../shared/contracts'
+
+const catalogo = iniciarCatalogo()
 
 const version = requiredElement<HTMLElement>('#app-version')
 const testDatabaseButton = requiredElement<HTMLButtonElement>('#test-db')
@@ -240,6 +243,7 @@ function renderSession(): void {
   sessionUser.textContent = usuarioAtual
     ? `${usuarioAtual.nome} · ${usuarioAtual.nivel === 'admin' ? 'Administrador' : 'Atendente'}`
     : ''
+  catalogo.atualizarSessao(autenticado)
 }
 
 function setStatus(message: string, tone: 'secondary' | 'success' | 'danger'): void {
