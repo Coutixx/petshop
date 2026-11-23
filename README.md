@@ -46,6 +46,18 @@ Depois que a migration e o seed terminarem com sucesso, execute `npm run dev` e 
 
 O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dentro do instalador. Cada integrante precisa usar suas próprias credenciais, a menos que o professor forneça uma conta específica para o projeto.
 
+## Produtos e dashboard local — Júlia
+
+Após `npm run dev`, use **Explorar produtos e dashboard de demonstração** na tela de login para testar o catálogo sem autenticação MySQL. Esse acesso abre somente dados locais de produtos; não libera clientes nem operações do banco. Após o login normal, a navegação também permite alternar entre dashboard, produtos e clientes.
+
+O catálogo começa com seis exemplos e salva alterações no armazenamento local do aplicativo (`petshop.julia.produtos.v1`). É uma demonstração compartilhada pelas sessões desse aplicativo no computador, não um banco de produção. Cadastro, edição, exclusão, pesquisa e filtro por categoria atualizam os indicadores. Use **Editar** para alterar a quantidade em estoque. Estoque zero indica indisponibilidade; de uma a cinco unidades indica estoque baixo. Se os dados locais estiverem corrompidos ou o armazenamento não puder ser aberto, o aplicativo informa a falha e preserva os dados existentes.
+
+Cada produto mantém seu preço na moeda de origem (BRL ou USD); a marcação de importado é independente da moeda. Clique em **Atualizar cotação** para consultar USD/BRL pela [AwesomeAPI](https://docs.awesomeapi.com.br/api-de-moedas), usando a taxa de venda `ask` e a data informada pelo provedor. As conversões arredondam para centavos e não incluem impostos ou taxas. Se a consulta falhar, a última cotação válida desta sessão permanece identificada com um aviso e sua data. Sem uma consulta válida, os preços convertidos ficam indisponíveis e o dashboard identifica o valor de estoque como parcial.
+
+As regras estão em `src/shared/domain/produtos`; a interface está em `src/renderer/src/modules/produtos`. `ProdutoService.listarResumos(taxa)` entrega o contrato `ProdutoResumo` com preços em BRL, omitindo itens em USD quando não há taxa válida. `validarDisponibilidade(itens)` verifica a soma das quantidades por produto sem baixar estoque. Antes do uso real, Henrique deve fornecer persistência/API IPC com autorização, e Nycollas deve conectar a validação ao checkout. A confirmação deverá revalidar e baixar o estoque em uma transação MySQL atômica. Recibos e histórico devem usar o preço confirmado da venda, não recalcular com uma cotação posterior.
+
+Validação: `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`. Os testes de interface usam happy-dom, com confirmação de exclusão simulada; a validação HTML nativa e a conferência visual do Electron precisam ser verificadas no desktop. Nenhuma migration ou seed é necessária para a demonstração de produtos.
+
 ## Divisão da equipe
 
 | Integrante | Módulo independente | Entrega na integração |
