@@ -16,6 +16,7 @@ export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void
   let autenticado = false
   let demonstracao = false
   let editando: number | null = null
+  let excluindo: number | null = null
   let tela: 'dashboard' | 'produtos' | 'clientes' = 'dashboard'
   let cotacao: ResultadoCotacao = { cotacao: null, emCache: false, mensagem: '' }
   const exchange = new CotacaoService()
@@ -46,6 +47,15 @@ export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void
   el('exit-demo').addEventListener('click', () => { demonstracao = false; fechar(); navegar() })
   el('new-product').addEventListener('click', () => abrir())
   el('cancel-product').addEventListener('click', fechar)
+  el('cancel-delete-product').addEventListener('click', cancelarExclusao)
+  el('confirm-delete-product').addEventListener('click', () => {
+    if (excluindo === null || !service) return
+    try {
+      service.excluir(excluindo)
+      if (editando === excluindo) fechar()
+      cancelarExclusao(); render(); status('Produto excluído do catálogo local.')
+    } catch (error) { status(mensagem(error), true) }
+  })
   el('product-search').addEventListener('input', render)
   el('product-filter').addEventListener('change', render)
   el('refresh-exchange').addEventListener('click', () => void atualizarCotacao())
@@ -67,6 +77,7 @@ export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void
   })
 
   function navegar(): void {
+    cancelarExclusao()
     const aberto = autenticado || demonstracao
     el('login-view').classList.toggle('d-none', aberto)
     el('clients-view').classList.toggle('d-none', !autenticado || tela !== 'clientes')
@@ -85,6 +96,7 @@ export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void
   }
 
   function abrir(produto?: Produto): void {
+    cancelarExclusao()
     form.reset()
     editando = produto?.id ?? null
     el('product-form-title').textContent = produto ? 'Editar produto e estoque' : 'Novo produto'
@@ -101,6 +113,11 @@ export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void
   }
 
   function fechar(): void { editando = null; form.reset(); form.classList.add('d-none') }
+
+  function cancelarExclusao(): void {
+    excluindo = null
+    el('product-delete-confirmation').classList.add('d-none')
+  }
 
   function render(): void {
     const produtos = service?.listar() ?? []
@@ -124,12 +141,10 @@ export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void
       const acoes = document.createElement('td')
       acoes.className = 'text-end text-nowrap'
       acoes.append(botao('Editar', 'secondary', () => abrir(produto)), botao('Excluir', 'danger', () => {
-        if (!window.confirm(`Excluir ${produto.nome} do catálogo local?`)) return
-        try {
-          service?.excluir(produto.id)
-          if (editando === produto.id) fechar()
-          render(); status('Produto excluído do catálogo local.')
-        } catch (error) { status(mensagem(error), true) }
+        excluindo = produto.id
+        el('product-delete-message').textContent = `Excluir ${produto.nome} do catálogo local? Esta ação não pode ser desfeita.`
+        el('product-delete-confirmation').classList.remove('d-none')
+        el('confirm-delete-product').focus()
       }))
       row.append(acoes); lista.append(row)
     }

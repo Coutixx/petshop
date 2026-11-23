@@ -22,6 +22,12 @@
   </section>
   <section id="catalog-products" class="d-none" aria-labelledby="products-title">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><div><h2 id="products-title" class="h5 mb-1">Produtos e estoque</h2><p class="small text-secondary mb-0">Preços de origem preservados em reais ou dólares.</p></div><button id="new-product" class="btn btn-primary" type="button">Novo produto</button></div>
+    <section id="product-delete-confirmation" class="alert alert-warning d-none" aria-labelledby="product-delete-title">
+      <h3 id="product-delete-title" class="h6">Confirmar exclusão</h3>
+      <p id="product-delete-message"></p>
+      <button id="confirm-delete-product" class="btn btn-danger btn-sm" type="button">Confirmar exclusão do produto</button>
+      <button id="cancel-delete-product" class="btn btn-outline-secondary btn-sm ms-2" type="button">Cancelar exclusão</button>
+    </section>
     <form id="product-form" class="card card-body border-0 shadow-sm mb-4 d-none">
       <h3 id="product-form-title" class="h6">Novo produto</h3>
       <div class="row g-3">

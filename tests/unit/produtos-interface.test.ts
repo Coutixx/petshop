@@ -12,7 +12,6 @@ beforeEach(() => {
   localStorage.clear()
   document.body.innerHTML = '<section id="login-view"><button id="demo-catalog">Demo</button></section><section id="clients-view" class="d-none">Clientes</section>'
   vi.restoreAllMocks()
-  window.confirm = vi.fn(() => true)
 })
 
 describe('interface de produtos e navegação', () => {
@@ -68,11 +67,12 @@ describe('interface de produtos e navegação', () => {
     expect(element('products-list').children.length).toBe(0)
     valor('product-filter', '')
     element('product-filter').dispatchEvent(new Event('change'))
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     element('products-list').querySelectorAll<HTMLButtonElement>('button')[1].click()
+    expect(element('product-delete-message').textContent).toContain('Petisco de teste')
+    element('cancel-delete-product').click()
     expect(element('products-list').children.length).toBe(1)
-    confirm.mockReturnValue(true)
     element('products-list').querySelectorAll<HTMLButtonElement>('button')[1].click()
+    element('confirm-delete-product').click()
     expect(element('products-list').children.length).toBe(0)
   })
 
@@ -96,5 +96,17 @@ describe('interface de produtos e navegação', () => {
     expect(element('catalog-status').textContent).toContain('preservados')
     expect(element<HTMLButtonElement>('new-product').disabled).toBe(true)
     expect(localStorage.getItem('petshop.julia.produtos.v1')).toBe('{corrompido')
+  })
+
+  it('cancela a exclusão pendente quando a pessoa troca de tela', () => {
+    iniciarCatalogo()
+    element('demo-catalog').click()
+    document.querySelector<HTMLButtonElement>('[data-screen="produtos"]')!.click()
+    element('products-list').querySelectorAll<HTMLButtonElement>('button')[1].click()
+    expect(element('product-delete-confirmation').classList.contains('d-none')).toBe(false)
+    document.querySelector<HTMLButtonElement>('[data-screen="dashboard"]')!.click()
+    element('confirm-delete-product').click()
+    expect(element('product-delete-confirmation').classList.contains('d-none')).toBe(true)
+    expect(element('products-list').children.length).toBe(6)
   })
 })
