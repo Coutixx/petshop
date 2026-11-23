@@ -5,11 +5,13 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
+    "prototype:historico": "vite src/renderer/src/modules/historico/prototype",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:seed": "node database/seeds/seed.mjs"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
