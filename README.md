@@ -46,7 +46,21 @@ Depois que a migration e o seed terminarem com sucesso, execute `npm run dev` e 
 
 O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dentro do instalador. Cada integrante precisa usar suas próprias credenciais, a menos que o professor forneça uma conta específica para o projeto.
 
-Para o checkout, aplique também `database/migrations/002-entregadores.sql` após `001-inicial.sql` e defina `STORE_ADDRESS` no `.env` com o endereço real da loja. A consulta geocodifica esse endereço e o endereço cadastrado do cliente para calcular a rota.
+## Produtos e dashboard local — Júlia
+
+Após `npm run dev`, use **Explorar produtos e dashboard de demonstração** na tela de login para testar o catálogo sem autenticação MySQL. Esse acesso abre somente dados locais de produtos; não libera clientes nem operações do banco. Após o login normal, a navegação também permite alternar entre dashboard, produtos e clientes.
+
+O catálogo começa com seis exemplos e salva alterações no armazenamento local do aplicativo (`petshop.julia.produtos.v1`). É uma demonstração compartilhada pelas sessões desse aplicativo no computador, não um banco de produção. Cadastro, edição, exclusão, pesquisa e filtro por categoria atualizam os indicadores. Use **Editar** para alterar a quantidade em estoque. Estoque zero indica indisponibilidade; de uma a cinco unidades indica estoque baixo. Se os dados locais estiverem corrompidos ou o armazenamento não puder ser aberto, o aplicativo informa a falha e preserva os dados existentes.
+
+Cada produto mantém seu preço na moeda de origem (BRL ou USD); a marcação de importado é independente da moeda. Clique em **Atualizar cotação** para consultar USD/BRL pela [AwesomeAPI](https://docs.awesomeapi.com.br/api-de-moedas), usando a taxa de venda `ask` e a data informada pelo provedor. As conversões arredondam para centavos e não incluem impostos ou taxas. Se a consulta falhar, a última cotação válida desta sessão permanece identificada com um aviso e sua data. Sem uma consulta válida, os preços convertidos ficam indisponíveis e o dashboard identifica o valor de estoque como parcial.
+
+As regras estão em `src/shared/domain/produtos`; a interface está em `src/renderer/src/modules/produtos`. `ProdutoService.listarResumos(taxa)` entrega o contrato `ProdutoResumo` com preços em BRL, omitindo itens em USD quando não há taxa válida. `validarDisponibilidade(itens)` verifica a soma das quantidades por produto sem baixar estoque. Antes do uso real, Henrique deve fornecer persistência/API IPC com autorização, e Nycollas deve conectar a validação ao checkout. A confirmação deverá revalidar e baixar o estoque em uma transação MySQL atômica. Recibos e histórico devem usar o preço confirmado da venda, não recalcular com uma cotação posterior.
+
+Para conferir visualmente só este módulo no navegador, execute `npm run prototype:produtos` e abra `http://127.0.0.1:5174`. A prévia usa o mesmo componente do Electron, sem simular APIs de clientes ou autenticação. O armazenamento de cada navegador/perfil é independente do Electron. A exclusão pede confirmação dentro da tela, com opções de cancelar e confirmar.
+
+Validação: `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`. Os testes de interface usam happy-dom; a validação HTML nativa é simulada nesses testes e também pode ser conferida na prévia real. Nenhuma migration ou seed é necessária para a demonstração de produtos.
+
+Se o Electron compilar e encerrar antes de abrir uma janela em um terminal restrito de automação, tente `npm run dev` no PowerShell normal do Windows, a partir da pasta do projeto. Isso não exige alterar o MySQL ou desativar a segurança do Electron. Se a instalação informar `Electron uninstall`, confirme que o download do binário foi permitido pelo npm e execute o instalador oficial local com `node node_modules/electron/install.js` antes de tentar novamente.
 
 ## Divisão da equipe
 
@@ -65,7 +79,7 @@ Para o checkout, aplique também `database/migrations/002-entregadores.sql` apó
 - [x] **[Henrique]** Configurar scripts de desenvolvimento, build, lint, testes, CSP e `contextIsolation`.
 - [x] **[Henrique]** Definir contratos TypeScript compartilhados (`ClienteResumo`, `ProdutoResumo`, `PedidoRascunho`) sem implementar telas de terceiros.
 - [x] **[Henrique]** Configurar credenciais MySQL locais e validar conexão com o servidor da escola.
-- [ ] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
+- [x] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
 - [ ] **[Nycollas]** Criar wireframe e tela estática do caixa/checkout com dados simulados.
 - [x] **[Enzo]** Criar [modelo visual de recibo e histórico](src/renderer/src/modules/historico/prototype/index.html) usando dados simulados.
 
@@ -83,13 +97,13 @@ Para o checkout, aplique também `database/migrations/002-entregadores.sql` apó
 
 ### Fase 3 - Módulo da Julia: produtos e estoque
 
-- [ ] **[Julia]** Criar interface `Produto`, serviço e repositório local/mocado para desenvolvimento isolado.
-- [ ] **[Julia]** Implementar tela e CRUD de produtos com dados de exemplo.
-- [ ] **[Julia]** Implementar categoria, preço em BRL, preço em USD, importado e quantidade em estoque.
-- [ ] **[Julia]** Integrar cotação do dólar com tratamento de falha da API.
-- [ ] **[Julia]** Implementar regra local que identifica produto indisponível quando o estoque for zero.
-- [ ] **[Julia]** Criar dashboard de produtos e indicadores de estoque.
-- [ ] **[Julia]** Criar dados de demonstração e testes do módulo de produtos.
+- [x] **[Julia]** Criar interface `Produto`, serviço e repositório local/mocado para desenvolvimento isolado.
+- [x] **[Julia]** Implementar tela e CRUD de produtos com dados de exemplo.
+- [x] **[Julia]** Implementar categoria, preço em BRL, preço em USD, importado e quantidade em estoque.
+- [x] **[Julia]** Integrar cotação do dólar com tratamento de falha da API.
+- [x] **[Julia]** Implementar regra local que identifica produto indisponível quando o estoque for zero.
+- [x] **[Julia]** Criar dashboard de produtos e indicadores de estoque.
+- [x] **[Julia]** Criar dados de demonstração e testes do módulo de produtos.
 
 ### Fase 4 - Módulo do Nycollas: entregadores, pedido e frete
 
@@ -144,7 +158,7 @@ Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge del
 ### Fase 7 - Entrega
 
 - [ ] **[Henrique]** Preparar banco com dados de demonstração e gerar build testável.
-- [ ] **[Julia]** Revisar consistência visual e navegação.
+- [x] **[Julia]** Revisar consistência visual e navegação.
 - [ ] **[Nycollas]** Revisar regras de pedido, frete e mensagens do checkout.
 - [ ] **[Enzo]** Atualizar documentação de instalação, uso e histórico de decisões.
 - [ ] **[Todos]** Revisar segurança, testes, checklist e Pull Requests.

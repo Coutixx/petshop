@@ -1,10 +1,25 @@
 import 'bootstrap/dist/css/bootstrap.min.css'
-import type { Cliente, ClienteInput, CriarPedidoInput, EntregadorInput, EntregadorResumo, ProdutoResumo, UsuarioAutenticado } from '../../shared/contracts'
+
+import { iniciarCatalogo } from './modules/produtos/catalogo'
+
+import type {
+  Cliente,
+  ClienteInput,
+  CriarPedidoInput,
+  EntregadorInput,
+  EntregadorResumo,
+  ProdutoResumo,
+  UsuarioAutenticado
+} from '../../shared/contracts'
+
 import type { Entregador } from '../../models/Entregador'
 import type { ProdutoCheckout } from '../../models/Produto'
+
 import { produtosMock } from '../../mocks/produtosMock'
 import { entregadoresMock } from '../../mocks/entregadoresMock'
 import { CheckoutService } from '../../services/CheckoutService'
+
+const catalogo = iniciarCatalogo()
 
 const version = requiredElement<HTMLElement>('#app-version')
 const testDatabaseButton = requiredElement<HTMLButtonElement>('#test-db')
@@ -373,6 +388,7 @@ function renderSession(): void {
   sessionUser.textContent = usuarioAtual
     ? `${usuarioAtual.nome} · ${usuarioAtual.nivel === 'admin' ? 'Administrador' : 'Atendente'}`
     : ''
+  catalogo.atualizarSessao(autenticado)
 }
 
 async function carregarCheckoutData(): Promise<void> {
