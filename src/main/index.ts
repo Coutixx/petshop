@@ -7,8 +7,8 @@ const rendererUrl = process.env.ELECTRON_RENDERER_URL
 
 function installContentSecurityPolicy(): void {
   const connectSource = rendererUrl
-    ? "connect-src 'self' ws://localhost:* http://localhost:*"
-    : "connect-src 'self'"
+    ? "connect-src 'self' ws://localhost:* http://localhost:* https://economia.awesomeapi.com.br"
+    : "connect-src 'self' https://economia.awesomeapi.com.br"
   const policy = [
     "default-src 'self'",
     "script-src 'self'",
