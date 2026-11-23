@@ -104,10 +104,11 @@ describe('CheckoutService', () => {
       entregadorId: null,
       itens: [{ produtoId: 1, quantidade: 2 }],
       frete: 10,
-      previsaoEntrega: null
+      previsaoEntrega: expect.any(String)
     })
 
     expect(Number.isNaN(Date.parse(pedido.criadoEm))).toBe(false)
+    expect(Date.parse(pedido.previsaoEntrega!)).toBeGreaterThan(Date.parse(pedido.criadoEm))
   })
 
   it('não permite criar pedido com carrinho vazio', () => {

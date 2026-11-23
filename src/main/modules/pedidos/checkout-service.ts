@@ -33,7 +33,7 @@ export class CheckoutService {
       itens: itens.map(({ produtoId, quantidade }) => ({ produtoId, quantidade })),
       frete,
       criadoEm: new Date().toISOString(),
-      previsaoEntrega: null
+      previsaoEntrega: new Date(Date.now() + 60 * 60 * 1000).toISOString()
     }
   }
 
