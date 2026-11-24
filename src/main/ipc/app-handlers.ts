@@ -100,6 +100,10 @@ export function registerAppHandlers(): void {
     exigirLogin(usuarioAtual)
     return pedidoService.criar(input as CriarPedidoInput)
   })
+  handleSafely('pedidos:listar', () => {
+    exigirLogin(usuarioAtual)
+    return pedidoService.listar()
+  })
 }
 
 function handleSafely(channel: string, handler: SafeHandler): void {

@@ -88,10 +88,26 @@ export interface CriarPedidoInput {
   duracaoMinutos: number
 }
 
-export interface PedidoRegistrado extends PedidoRascunho {
-  id: number
+export interface ItemPedidoConfirmado {
+  produtoId: number
+  nome: string
+  precoUnitario: number
+  quantidade: number
   subtotal: number
+}
+
+export interface PedidoRegistrado {
+  id: number
+  clienteId: number
+  clienteNome: string
+  clienteEmail: string | null
+  entregadorId: number | null
+  itens: ItemPedidoConfirmado[]
+  subtotal: number
+  frete: number
   total: number
+  criadoEm: string
+  previsaoEntrega: string | null
 }
 
 export interface DesktopApi {
@@ -112,6 +128,7 @@ export interface DesktopApi {
   excluirEntregador(id: number): Promise<void>
   calcularDistancia(destino: string): Promise<RotaCalculada>
   criarPedido(input: CriarPedidoInput): Promise<PedidoRegistrado>
+  listarPedidos(): Promise<PedidoRegistrado[]>
 }
 
 export interface DatabaseConnectionTestResult {
