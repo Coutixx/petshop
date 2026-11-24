@@ -22,6 +22,7 @@
       <nav id="app-nav" class="d-none gap-2 mb-4" aria-label="Navegação principal">
         <button id="nav-checkout" class="btn btn-primary btn-sm" type="button">Checkout</button>
         <button id="nav-clients" class="btn btn-outline-secondary btn-sm" type="button">Clientes</button>
+        <button id="nav-history" class="btn btn-outline-secondary btn-sm" type="button">Histórico</button>
       </nav>
 
       <p id="app-status" class="small mb-3" role="status" aria-live="polite"></p>
@@ -178,6 +179,18 @@
             </div></div>
           </div>
         </div>
+      </section>
+
+      <section id="history-view" class="d-none" aria-labelledby="history-title">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <h2 id="history-title" class="h5 mb-1">Histórico de vendas</h2>
+            <p class="text-secondary small mb-0">Pedidos confirmados, itens e recibos.</p>
+          </div>
+          <button id="refresh-history" class="btn btn-outline-secondary" type="button">Atualizar</button>
+        </div>
+        <p id="history-empty" class="text-secondary small">Nenhum pedido confirmado.</p>
+        <div id="history-list" class="vstack gap-3"></div>
       </section>
 
       <footer class="border-top mt-5 pt-3">

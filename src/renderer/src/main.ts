@@ -8,9 +8,11 @@ import type {
   CriarPedidoInput,
   EntregadorInput,
   EntregadorResumo,
+  PedidoRegistrado,
   ProdutoResumo,
   UsuarioAutenticado
 } from '../../shared/contracts'
+import { criarServicoEmail, tentarEnviarReciboVenda } from '../../shared/domain/recibos/email-service'
 
 import type { Entregador } from '../../models/Entregador'
 import type { ProdutoCheckout } from '../../models/Produto'
@@ -29,6 +31,7 @@ const loginForm = requiredElement<HTMLFormElement>('#login-form')
 const loginSubmit = requiredElement<HTMLButtonElement>('#login-submit')
 const clientsView = requiredElement<HTMLElement>('#clients-view')
 const checkoutView = requiredElement<HTMLElement>('#checkout-view')
+const historyView = requiredElement<HTMLElement>('#history-view')
 const clientsList = requiredElement<HTMLTableSectionElement>('#clients-list')
 const clientsEmpty = requiredElement<HTMLElement>('#clients-empty')
 const clientForm = requiredElement<HTMLFormElement>('#client-form')
@@ -49,6 +52,7 @@ let distanciaCalculada: number | null = null
 let duracaoCalculada: number | null = null
 let produtosIntegrados = false
 let entregadoresIntegrados = false
+const emailService = criarServicoEmail()
 
 window.petShop.getAppVersion()
   .then((appVersion) => {
@@ -119,14 +123,24 @@ requiredElement<HTMLButtonElement>('#cancel-client').addEventListener('click', f
 function showClients(): void {
   clientsView.classList.remove('d-none')
   checkoutView.classList.add('d-none')
+  historyView.classList.add('d-none')
 }
 function showCheckout(): void {
   clientsView.classList.add('d-none')
   checkoutView.classList.remove('d-none')
+  historyView.classList.add('d-none')
+}
+function showHistory(): void {
+  clientsView.classList.add('d-none')
+  checkoutView.classList.add('d-none')
+  historyView.classList.remove('d-none')
+  void carregarHistorico()
 }
 requiredElement<HTMLButtonElement>('#show-clients').addEventListener('click', showClients)
 requiredElement<HTMLButtonElement>('#nav-checkout').addEventListener('click', showCheckout)
 requiredElement<HTMLButtonElement>('#nav-clients').addEventListener('click', showClients)
+requiredElement<HTMLButtonElement>('#nav-history').addEventListener('click', showHistory)
+requiredElement<HTMLButtonElement>('#refresh-history').addEventListener('click', () => void carregarHistorico())
 
 requiredElement<HTMLFormElement>('#deliverer-form').addEventListener('submit', async (event) => {
   event.preventDefault()
@@ -205,6 +219,18 @@ requiredElement<HTMLButtonElement>('#create-order').addEventListener('click', as
     requiredElement<HTMLElement>('#checkout-shipping').textContent = formatCurrency(pedido.frete)
     requiredElement<HTMLElement>('#checkout-total').textContent = formatCurrency(pedido.total)
     requiredElement<HTMLElement>('#order-preview').textContent = `Pedido #${pedido.id} registrado · previsão: ${previsto}.`
+    const envio = await tentarEnviarReciboVenda({
+      id: String(pedido.id),
+      cliente: pedido.clienteNome,
+      email: pedido.clienteEmail ?? '',
+      totalCentavos: Math.round(pedido.total * 100),
+      status: 'confirmada',
+    }, emailService)
+    if (envio.enviado) {
+      requiredElement<HTMLElement>('#order-preview').textContent += ' Recibo processado em modo mock.'
+    } else {
+      requiredElement<HTMLElement>('#order-preview').textContent += ` Venda confirmada; falha no recibo: ${envio.erro.message}`
+    }
     checkout.limparCarrinho()
     distanciaCalculada = null
     duracaoCalculada = null
@@ -378,7 +404,12 @@ function renderSession(): void {
   if (!autenticado) {
     clientsView.classList.add('d-none')
     checkoutView.classList.add('d-none')
-  } else if (clientsView.classList.contains('d-none') && checkoutView.classList.contains('d-none')) {
+    historyView.classList.add('d-none')
+  } else if (
+    clientsView.classList.contains('d-none') &&
+    checkoutView.classList.contains('d-none') &&
+    historyView.classList.contains('d-none')
+  ) {
     showCheckout()
   }
   appNav.classList.toggle('d-none', !autenticado)
@@ -424,6 +455,126 @@ async function carregarCheckoutData(): Promise<void> {
   renderProdutos()
   renderClientesCheckout()
   renderEntregadores()
+}
+
+async function carregarHistorico(): Promise<void> {
+  const container = requiredElement<HTMLElement>('#history-list')
+  const empty = requiredElement<HTMLElement>('#history-empty')
+  try {
+    const pedidos = await window.petShop.listarPedidos()
+    container.replaceChildren()
+    empty.classList.toggle('d-none', pedidos.length > 0)
+    for (const pedido of pedidos) container.append(renderPedidoHistorico(pedido))
+  } catch (error) {
+    container.replaceChildren()
+    empty.classList.remove('d-none')
+    empty.textContent = errorMessage(error, 'Não foi possível carregar o histórico.')
+  }
+}
+
+function renderPedidoHistorico(pedido: PedidoRegistrado): HTMLElement {
+  const details = document.createElement('details')
+  details.className = 'border rounded bg-white'
+
+  const summary = document.createElement('summary')
+  summary.className = 'd-flex flex-wrap align-items-center gap-3 p-3'
+  const numero = String(pedido.id).padStart(5, '0')
+  summary.innerHTML = `
+    <strong>Pedido #${numero}</strong>
+    <span class="text-secondary">${escapeHtml(pedido.clienteNome)}</span>
+    <strong class="ms-auto">${formatCurrency(pedido.total)}</strong>
+    <span class="badge text-bg-success">Confirmada</span>
+  `
+  details.append(summary)
+
+  const receipt = document.createElement('article')
+  receipt.className = 'border-top p-3'
+
+  const meta = document.createElement('p')
+  meta.className = 'text-secondary small'
+  meta.textContent = `Cliente: ${pedido.clienteNome} · ${
+    pedido.clienteEmail ?? 'Sem e-mail cadastrado'
+  } · Pedido em ${new Date(pedido.criadoEm).toLocaleString('pt-BR')}`
+  receipt.append(meta)
+
+  const table = document.createElement('div')
+  table.className = 'table-responsive'
+  const tableElement = document.createElement('table')
+  tableElement.className = 'table table-sm align-middle'
+  tableElement.innerHTML = `
+    <thead><tr><th>Produto</th><th class="text-end">Qtd.</th><th class="text-end">Unitário</th><th class="text-end">Subtotal</th></tr></thead>
+  `
+  const body = document.createElement('tbody')
+  for (const item of pedido.itens) {
+    const row = document.createElement('tr')
+    row.innerHTML = `
+      <td>${escapeHtml(item.nome)}</td>
+      <td class="text-end">${item.quantidade}</td>
+      <td class="text-end">${formatCurrency(item.precoUnitario)}</td>
+      <td class="text-end">${formatCurrency(item.subtotal)}</td>
+    `
+    body.append(row)
+  }
+  tableElement.append(body)
+  table.append(tableElement)
+  receipt.append(table)
+
+  const totals = document.createElement('div')
+  totals.className = 'ms-auto text-end'
+  totals.style.maxWidth = '240px'
+  totals.innerHTML = `
+    <div class="d-flex justify-content-between"><span>Subtotal</span><strong>${formatCurrency(pedido.subtotal)}</strong></div>
+    <div class="d-flex justify-content-between"><span>Frete</span><strong>${formatCurrency(pedido.frete)}</strong></div>
+    <div class="d-flex justify-content-between fs-5 mt-1"><span>Total</span><strong>${formatCurrency(pedido.total)}</strong></div>
+  `
+  receipt.append(totals)
+
+  const actions = document.createElement('div')
+  actions.className = 'd-flex align-items-center gap-2 mt-3'
+  const printButton = document.createElement('button')
+  printButton.type = 'button'
+  printButton.className = 'btn btn-outline-secondary btn-sm'
+  printButton.textContent = 'Imprimir recibo'
+  printButton.addEventListener('click', () => {
+    details.open = true
+    window.print()
+  })
+  const sendButton = document.createElement('button')
+  sendButton.type = 'button'
+  sendButton.className = 'btn btn-outline-primary btn-sm'
+  sendButton.textContent = 'Enviar por e-mail'
+  const status = document.createElement('span')
+  status.className = 'small text-secondary'
+  status.setAttribute('role', 'status')
+  sendButton.addEventListener('click', async () => {
+    sendButton.disabled = true
+    status.textContent = 'Processando envio em modo mock...'
+    const resultado = await tentarEnviarReciboVenda({
+      id: String(pedido.id),
+      cliente: pedido.clienteNome,
+      email: pedido.clienteEmail ?? '',
+      totalCentavos: Math.round(pedido.total * 100),
+      status: 'confirmada',
+    }, emailService)
+    if (resultado.enviado) {
+      status.className = 'small text-success'
+      status.textContent = 'Recibo processado em modo mock.'
+    } else {
+      status.className = 'small text-danger'
+      status.textContent = `Venda confirmada. Envio não realizado: ${resultado.erro.message}`
+    }
+    sendButton.disabled = false
+  })
+  actions.append(sendButton, printButton, status)
+  receipt.append(actions)
+  details.append(receipt)
+  return details
+}
+
+function escapeHtml(value: string): string {
+  const element = document.createElement('span')
+  element.textContent = value
+  return element.innerHTML
 }
 
 function renderProdutos(): void {
