@@ -51,6 +51,7 @@ let duracaoCalculada: number | null = null
 let revisaoEntregadores = 0
 let revisaoProdutos = 0
 let revisaoRota = 0
+let entregadorEmEdicao: EntregadorResumo | null = null
 let salvandoEntregador = false
 let confirmandoPedido = false
 let telaAtual = 'dashboard'
@@ -146,13 +147,35 @@ delivererForm.addEventListener('submit', async (event) => {
   const name = requiredElement<HTMLInputElement>('#deliverer-name')
   const phone = requiredElement<HTMLInputElement>('#deliverer-phone')
   const vehicle = requiredElement<HTMLInputElement>('#deliverer-vehicle')
-  const input: EntregadorInput = { nome: name.value.trim(), telefone: phone.value.trim(), veiculo: vehicle.value.trim(), disponivel: true }
+  const anterior = entregadorEmEdicao
+  const input: EntregadorInput = {
+    nome: name.value.trim(), telefone: phone.value.trim(), veiculo: vehicle.value.trim(),
+    disponivel: anterior?.disponivel ?? true
+  }
   await alterarEntregador(async () => {
-    const created = await window.petShop.criarEntregador(input)
-    entregadoresCheckout.push(created)
-    delivererForm.reset()
-  }, 'Entregador cadastrado.')
+    if (anterior) {
+      const atualizado = await window.petShop.atualizarEntregador(anterior.id, input, anterior)
+      entregadoresCheckout = entregadoresCheckout.map(item => item.id === anterior.id ? atualizado : item)
+    } else {
+      entregadoresCheckout.push(await window.petShop.criarEntregador(input))
+    }
+    editarEntregador(null)
+  }, anterior ? 'Cadastro atualizado.' : 'Entregador cadastrado.')
 })
+
+function editarEntregador(entregador: EntregadorResumo | null): void {
+  entregadorEmEdicao = entregador
+  delivererForm.reset()
+  delivererSubmit.textContent = entregador ? 'Salvar' : 'Adicionar'
+  requiredElement('#cancel-deliverer').classList.toggle('d-none', !entregador)
+  if (entregador) {
+    requiredElement<HTMLInputElement>('#deliverer-name').value = entregador.nome
+    requiredElement<HTMLInputElement>('#deliverer-phone').value = entregador.telefone
+    requiredElement<HTMLInputElement>('#deliverer-vehicle').value = entregador.veiculo
+    requiredElement('#deliverer-name').focus()
+  }
+}
+requiredElement('#cancel-deliverer').addEventListener('click', () => editarEntregador(null))
 
 async function alterarEntregador(alterar: () => Promise<void>, mensagem: string): Promise<void> {
   if (salvandoEntregador || !usuarioAtual) return
@@ -161,15 +184,20 @@ async function alterarEntregador(alterar: () => Promise<void>, mensagem: string)
   delivererSubmit.disabled = true
   delivererStatus.textContent = 'Salvando…'
   renderEntregadores()
+  let falha = ''
   try {
     await alterar()
     delivererStatus.textContent = mensagem
   } catch (error) {
-    delivererStatus.textContent = errorMessage(error, 'Não foi possível salvar o entregador.')
+    falha = errorMessage(error, 'Não foi possível salvar o entregador.')
   } finally {
     salvandoEntregador = false
     delivererSubmit.disabled = false
     renderEntregadores()
+  }
+  if (falha) {
+    await carregarEntregadores()
+    delivererStatus.textContent = falha
   }
 }
 
@@ -191,6 +219,9 @@ requiredElement<HTMLButtonElement>('#calculate-delivery').addEventListener('clic
     return
   }
   const revisao = ++revisaoRota
+  distanciaCalculada = null
+  duracaoCalculada = null
+  renderCarrinho()
   setStatus('Consultando a rota para o endereço do cliente...', 'secondary')
   try {
     const rota = await window.petShop.calcularDistancia(clienteId)
@@ -733,10 +764,16 @@ function renderEntregadores(): void {
     toggle.textContent = entregador.disponivel ? 'Disponível' : 'Indisponível'
     toggle.disabled = salvandoEntregador
     toggle.addEventListener('click', () => void alterarEntregador(async () => {
-      const updated = await window.petShop.atualizarEntregador(entregador.id, { ...entregador, disponivel: !entregador.disponivel })
+      const updated = await window.petShop.atualizarEntregador(entregador.id, { ...entregador, disponivel: !entregador.disponivel }, entregador)
       entregadoresCheckout = entregadoresCheckout.map(item => item.id === updated.id ? updated : item)
     }, 'Disponibilidade atualizada.'))
-    row.append(label, toggle)
+    const editar = document.createElement('button')
+    editar.type = 'button'
+    editar.className = 'btn btn-sm btn-outline-secondary'
+    editar.textContent = 'Editar'
+    editar.disabled = salvandoEntregador
+    editar.addEventListener('click', () => editarEntregador(entregador))
+    row.append(label, toggle, editar)
     if (usuarioAtual?.nivel === 'admin') {
       const remove = document.createElement('button')
       remove.type = 'button'
@@ -745,6 +782,7 @@ function renderEntregadores(): void {
       remove.disabled = salvandoEntregador
       remove.addEventListener('click', () => void alterarEntregador(async () => {
         await window.petShop.excluirEntregador(entregador.id)
+        if (entregadorEmEdicao?.id === entregador.id) editarEntregador(null)
         entregadoresCheckout = entregadoresCheckout.filter(item => item.id !== entregador.id)
       }, 'Entregador removido.'))
       row.append(remove)
@@ -764,7 +802,8 @@ function setStatus(message: string, tone: 'secondary' | 'success' | 'danger'): v
 }
 
 function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
+  if (!(error instanceof Error) || !error.message) return fallback
+  return error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '')
 }
 
 function stringValue(data: FormData, key: string): string {

@@ -133,7 +133,7 @@ export interface DesktopApi {
   listarProdutos(): Promise<ProdutoResumo[]>
   listarEntregadores(): Promise<EntregadorResumo[]>
   criarEntregador(input: EntregadorInput): Promise<EntregadorResumo>
-  atualizarEntregador(id: number, input: EntregadorInput): Promise<EntregadorResumo>
+  atualizarEntregador(id: number, input: EntregadorInput, anterior?: EntregadorInput): Promise<EntregadorResumo>
   excluirEntregador(id: number): Promise<void>
   calcularDistancia(clienteId: number): Promise<RotaCalculada>
   criarPedido(input: CriarPedidoInput): Promise<PedidoRegistrado>

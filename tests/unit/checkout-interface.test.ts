@@ -41,6 +41,12 @@ it('carrega entregadores independentemente dos produtos e reflete cada escrita c
   await vi.waitFor(() => expect(select.options[1].disabled).toBe(true))
   expect(select.value).toBe('')
   list.querySelectorAll('button')[1].click()
+  document.querySelector<HTMLInputElement>('#deliverer-name')!.value = 'Ana Costa'
+  document.querySelector('#deliverer-form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  await vi.waitFor(() => expect(list.textContent).toContain('Ana Costa'))
+  expect(api.criarEntregador).toHaveBeenCalledTimes(1)
+  expect(select.options[1].disabled).toBe(true)
+  list.querySelectorAll('button')[2].click()
   await vi.waitFor(() => expect(list.childElementCount).toBe(0))
   expect(select.options.length).toBe(1)
 })

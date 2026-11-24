@@ -140,9 +140,9 @@ export function registerAppHandlers(): void {
     exigirLogin(usuarioAtual)
     return entregadorService.criar(input as EntregadorInput)
   })
-  handleSafely('entregadores:atualizar', (_event, id, input) => {
+  handleSafely('entregadores:atualizar', (_event, id, input, anterior) => {
     exigirLogin(usuarioAtual)
-    return entregadorService.atualizar(typeof id === 'number' ? id : Number.NaN, input as EntregadorInput)
+    return entregadorService.atualizar(typeof id === 'number' ? id : Number.NaN, input as EntregadorInput, anterior as EntregadorInput | undefined)
   })
   handleSafely('entregadores:excluir', (_event, id) => {
     exigirAdmin(usuarioAtual)
