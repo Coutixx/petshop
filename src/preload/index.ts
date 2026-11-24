@@ -18,7 +18,8 @@ const api: DesktopApi = {
   atualizarEntregador: (id, input) => ipcRenderer.invoke('entregadores:atualizar', id, input),
   excluirEntregador: (id) => ipcRenderer.invoke('entregadores:excluir', id),
   calcularDistancia: (destino) => ipcRenderer.invoke('distancia:calcular', destino),
-  criarPedido: (input) => ipcRenderer.invoke('pedidos:criar', input)
+  criarPedido: (input) => ipcRenderer.invoke('pedidos:criar', input),
+  listarPedidos: () => ipcRenderer.invoke('pedidos:listar')
 }
 
 contextBridge.exposeInMainWorld('petShop', api)

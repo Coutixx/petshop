@@ -3,6 +3,7 @@ import { PedidoRepository } from './pedido-repository'
 
 export interface PedidoRepositoryPort {
   criar(input: CriarPedidoInput): Promise<PedidoRegistrado>
+  listar(): Promise<PedidoRegistrado[]>
 }
 
 export class PedidoEntradaInvalidaError extends Error {
@@ -31,6 +32,10 @@ export class PedidoService {
       ...input,
       itens: [...quantidades].map(([produtoId, quantidade]) => ({ produtoId, quantidade }))
     })
+  }
+
+  listar(): Promise<PedidoRegistrado[]> {
+    return this.repository.listar()
   }
 }
 
