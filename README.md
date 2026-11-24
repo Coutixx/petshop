@@ -149,7 +149,7 @@ Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge del
 - [ ] **[Henrique]** Criar/adaptar repositórios MySQL para `Produto`, `Entregador`, `Pedido` e `ItemPedido` a partir dos contratos entregues.
 - [ ] **[Julia]** Substituir os dados de exemplo de produtos pela API IPC fornecida por Henrique.
 - [x] **[Nycollas]** Substituir os dados simulados de cliente, produto e entregador pelas APIs IPC; conectar o checkout ao pedido real.
-- [ ] **[Enzo]** Conectar itens, recibo, histórico e e-mail ao pedido confirmado.
+- [x] **[Enzo]** Conectar itens, recibo, histórico e e-mail ao pedido confirmado.
 - [ ] **[Julia]** Conectar a validação de estoque ao fechamento da venda.
 - [x] **[Nycollas]** Conectar o cálculo de frete/distância ao total final do pedido.
 - [ ] **[Henrique]** Validar transação de venda: gravar pedido, gravar itens e baixar estoque de forma atômica.
