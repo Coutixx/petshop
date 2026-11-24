@@ -28,16 +28,16 @@ export interface CatalogoPedidos {
 }
 
 export function validarProduto(input: ProdutoInput): ProdutoInput {
-  if (typeof input.nome !== 'string' || !input.nome.trim() || input.nome.trim().length > 120) {
+  if (!input || typeof input.nome !== 'string' || !input.nome.trim() || input.nome.trim().length > 120) {
     throw new Error('Informe um nome de produto com até 120 caracteres.')
   }
   if (!categoriasProduto.includes(input.categoria)) throw new Error('Categoria inválida.')
   if (input.moeda !== 'BRL' && input.moeda !== 'USD') throw new Error('Moeda inválida.')
-  if (!Number.isFinite(input.preco) || input.preco <= 0 || input.preco > 999999.99) {
+  if (!Number.isFinite(input.preco) || input.preco < 0.01 || input.preco > 999999.99) {
     throw new Error('Informe um preço maior que zero e até 999.999,99.')
   }
   if (typeof input.importado !== 'boolean') throw new Error('Informe se o produto é importado.')
-  if (!Number.isSafeInteger(input.estoque) || input.estoque < 0) {
+  if (!Number.isSafeInteger(input.estoque) || input.estoque < 0 || input.estoque > 4294967295) {
     throw new Error('O estoque deve ser um número inteiro maior ou igual a zero.')
   }
   return { ...input, nome: input.nome.trim(), preco: Number(input.preco.toFixed(2)) }

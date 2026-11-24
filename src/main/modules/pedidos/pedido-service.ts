@@ -21,16 +21,18 @@ export class PedidoService {
     if (!Number.isFinite(input.distanciaKm) || input.distanciaKm < 0) throw new PedidoEntradaInvalidaError('Distância inválida.')
     if (!Number.isFinite(input.duracaoMinutos) || input.duracaoMinutos < 0) throw new PedidoEntradaInvalidaError('Duração da rota inválida.')
 
-    const quantidades = new Map<number, number>()
+    const itens = new Map<number, CriarPedidoInput['itens'][number]>()
     for (const item of input.itens) {
       if (!item || typeof item !== 'object') throw new PedidoEntradaInvalidaError('Item de pedido inválido.')
       validarId(item.produtoId, 'Produto')
       if (!Number.isSafeInteger(item.quantidade) || item.quantidade < 1) throw new PedidoEntradaInvalidaError('Quantidade inválida.')
-      quantidades.set(item.produtoId, (quantidades.get(item.produtoId) ?? 0) + item.quantidade)
+      const quantidade = (itens.get(item.produtoId)?.quantidade ?? 0) + item.quantidade
+      if (!Number.isSafeInteger(quantidade)) throw new PedidoEntradaInvalidaError('Quantidade inválida.')
+      itens.set(item.produtoId, { ...item, quantidade })
     }
     return this.repository.criar({
       ...input,
-      itens: [...quantidades].map(([produtoId, quantidade]) => ({ produtoId, quantidade }))
+      itens: [...itens.values()].sort((a, b) => a.produtoId - b.produtoId)
     })
   }
 

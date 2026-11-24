@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import type { CriarPedidoInput, PedidoRegistrado } from '../../../shared/contracts'
 import { getMySqlPool } from '../../database/connection'
+import { converterPreco } from '../../../shared/domain/produtos/produto'
 import { FreteService } from './frete-service'
 import { PedidoOperacaoError } from './pedido-errors'
 
@@ -8,6 +9,7 @@ interface ProdutoPedidoRow extends RowDataPacket {
   id: number
   nome: string
   preco: number | string
+  moeda: 'BRL' | 'USD'
   quantidade_estoque: number
 }
 
@@ -31,8 +33,11 @@ interface ItemPedidoRow extends RowDataPacket {
 }
 
 export class PedidoRepository {
+  constructor(private readonly taxaAtual: () => number | null = () => null) {}
+
   async criar(input: CriarPedidoInput): Promise<PedidoRegistrado> {
     const connection = await getMySqlPool().getConnection()
+    const taxa = this.taxaAtual()
     const criadoEm = new Date()
     const previsaoEntrega = new Date(criadoEm.getTime() + (Math.max(30, input.duracaoMinutos + 20) * 60_000))
 
@@ -56,13 +61,17 @@ export class PedidoRepository {
       const itens: Array<{ produtoId: number; nome: string; quantidade: number; preco: number }> = []
       for (const item of input.itens) {
         const [produtoRows] = await connection.execute<ProdutoPedidoRow[]>(
-          `SELECT id, nome, preco_brl AS preco, quantidade_estoque
-           FROM produtos WHERE id = ? FOR UPDATE`, [item.produtoId]
+          `SELECT id, nome, moeda, IF(moeda = 'USD', preco_usd, preco_brl) AS preco, quantidade_estoque
+           FROM produtos WHERE id = ? AND ativo = TRUE FOR UPDATE`, [item.produtoId]
         )
         const produto = produtoRows[0]
         if (!produto) throw new PedidoOperacaoError(`Produto ${item.produtoId} não encontrado.`)
         if (produto.quantidade_estoque < item.quantidade) throw new PedidoOperacaoError(`Estoque insuficiente para ${produto.nome}.`)
-        const preco = Number(produto.preco)
+        const preco = converterPreco({ moeda: produto.moeda, preco: Number(produto.preco) }, 'BRL', taxa)
+        if (preco === null) throw new PedidoOperacaoError('Atualize a cotação antes de vender produtos em dólar.')
+        if (item.precoEsperado !== undefined && item.precoEsperado !== preco) {
+          throw new PedidoOperacaoError('O preço mudou. Remova o item e adicione novamente ao carrinho.')
+        }
         subtotal += preco * item.quantidade
         itens.push({ produtoId: item.produtoId, nome: produto.nome, quantidade: item.quantidade, preco })
       }
@@ -72,8 +81,8 @@ export class PedidoRepository {
 
       const [orderResult] = await connection.execute<ResultSetHeader>(
         `INSERT INTO pedidos (cliente_id, entregador_id, status, subtotal, frete, criado_em, previsao_entrega)
-         VALUES (?, ?, 'aberto', ?, ?, ?, ?)`,
-        [input.clienteId, input.entregadorId, subtotal, frete, mysqlDate(criadoEm), mysqlDate(previsaoEntrega)]
+         VALUES (?, ?, 'confirmado', ?, ?, ?, ?)`,
+        [input.clienteId, input.entregadorId, subtotal, frete, criadoEm, previsaoEntrega]
       )
 
       for (const item of itens) {
@@ -171,8 +180,4 @@ export class PedidoRepository {
     }
     return pedidos
   }
-}
-
-function mysqlDate(date: Date): string {
-  return date.toISOString().slice(0, 19).replace('T', ' ')
 }
