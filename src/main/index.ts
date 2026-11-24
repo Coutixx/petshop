@@ -1,14 +1,18 @@
-import 'dotenv/config'
-import { app, BrowserWindow, session } from 'electron'
+import { config } from 'dotenv'
+import { app, BrowserWindow, Menu, nativeImage, session } from 'electron'
 import { join } from 'node:path'
 import { registerAppHandlers } from './ipc/app-handlers'
 
-const rendererUrl = process.env.ELECTRON_RENDERER_URL
+app.setName('PetShop Cotil')
+app.setAppUserModelId('br.cotil.petshop')
+const icon = join(app.getAppPath(), 'resources/icon.png')
+config(process.env.PORTABLE_EXECUTABLE_DIR ? { path: join(process.env.PORTABLE_EXECUTABLE_DIR, '.env') } : {})
+const rendererUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
 
 function installContentSecurityPolicy(): void {
   const connectSource = rendererUrl
-    ? "connect-src 'self' ws://localhost:* http://localhost:* https://economia.awesomeapi.com.br"
-    : "connect-src 'self' https://economia.awesomeapi.com.br"
+    ? "connect-src 'self' ws://localhost:* http://localhost:*"
+    : "connect-src 'self'"
   const policy = [
     "default-src 'self'",
     "script-src 'self'",
@@ -34,6 +38,9 @@ function installContentSecurityPolicy(): void {
 
 function createWindow(): void {
   const window = new BrowserWindow({
+    title: 'PetShop Cotil',
+    icon,
+    backgroundColor: '#f6f8f5',
     width: 1100,
     height: 760,
     minWidth: 800,
@@ -46,6 +53,10 @@ function createWindow(): void {
     }
   })
 
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url !== window.webContents.getURL()) event.preventDefault()
+  })
   if (rendererUrl) {
     void window.loadURL(rendererUrl)
   } else {
@@ -54,6 +65,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin') app.dock?.setIcon(nativeImage.createFromPath(icon))
+  Menu.setApplicationMenu(null)
   installContentSecurityPolicy()
   registerAppHandlers()
   createWindow()

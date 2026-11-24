@@ -1,33 +1,39 @@
 import markup from './catalogo.html?raw'
-import { categoriasProduto, converterPreco, type CategoriaProduto, type Produto } from '../../../../shared/domain/produtos/produto'
-import { ProdutoRepositoryLocal } from '../../../../shared/domain/produtos/produto-repository-local'
-import { ProdutoService } from '../../../../shared/domain/produtos/produto-service'
-import { produtosDemo } from '../../../../shared/domain/produtos/produtos-demo'
-import { CotacaoService, type ResultadoCotacao } from '../../../../shared/domain/produtos/cotacao-service'
+import { categoriasProduto, converterPreco, type CategoriaProduto, type Produto, type ProdutoInput } from '../../../../shared/domain/produtos/produto'
+import type { ResultadoCotacao } from '../../../../shared/domain/produtos/cotacao-service'
 import { indicadoresEstoque } from '../../../../shared/domain/produtos/dashboard'
 
-export function iniciarCatalogo(
-  options: { permitirDemonstracao?: boolean } = {}
-): { atualizarSessao(autenticado: boolean): void } {
+export interface CatalogoApi {
+  listarCatalogo(): Promise<Produto[]>
+  criarProduto(input: ProdutoInput): Promise<void>
+  atualizarProduto(id: number, input: ProdutoInput, estoqueAnterior: number): Promise<void>
+  excluirProduto(id: number): Promise<void>
+  atualizarCotacao(): Promise<ResultadoCotacao>
+}
+
+export function iniciarCatalogo(api: CatalogoApi) {
   const host = document.createElement('div')
-  // Apenas HTML estático do projeto; os dados do usuário são inseridos via textContent.
   host.innerHTML = markup
   el('clients-view').before(host)
   const form = el<HTMLFormElement>('product-form')
-  let service: ProdutoService | null = null
-  let autenticado = false
-  let demonstracao = false
-  let editando: number | null = null
+  let produtos: Produto[] = []
+  let editando: Produto | null = null
   let excluindo: number | null = null
-  let tela: 'dashboard' | 'produtos' | 'clientes' = 'dashboard'
+  let podeExcluir = false
+  let versaoLista = 0
+  let sessao = 0
   let cotacao: ResultadoCotacao = { cotacao: null, emCache: false, mensagem: '' }
-  const exchange = new CotacaoService()
 
-  try {
-    service = new ProdutoService(new ProdutoRepositoryLocal(produtosDemo, window.localStorage))
-  } catch {
-    status('Não foi possível abrir o catálogo local. Os dados salvos foram preservados. Verifique o armazenamento do aplicativo.', true)
-    el<HTMLButtonElement>('new-product').disabled = true
+  async function atualizar(): Promise<void> {
+    const versao = ++versaoLista
+    try {
+      const lista = await api.listarCatalogo()
+      if (versao !== versaoLista) return
+      produtos = lista
+      render()
+    } catch (error) {
+      if (versao === versaoLista) status(mensagem(error), true)
+    }
   }
 
   for (const categoria of categoriasProduto) {
@@ -37,42 +43,32 @@ export function iniciarCatalogo(
       el<HTMLSelectElement>(id).append(option)
     }
   }
-  document.querySelectorAll<HTMLButtonElement>('[data-screen]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const destino = button.dataset.screen
-      if (destino === 'clientes' && !autenticado) return
-      if (destino === 'dashboard' || destino === 'produtos' || destino === 'clientes') tela = destino
-      navegar()
-    })
-  })
-  const demoButton = document.getElementById('demo-catalog')
-  if (options.permitirDemonstracao !== false) {
-    demoButton?.addEventListener('click', () => {
-      demonstracao = true
-      tela = 'dashboard'
-      navegar()
-      render()
-    })
-  }
-  el('exit-demo').addEventListener('click', () => { demonstracao = false; fechar(); navegar() })
   el('new-product').addEventListener('click', () => abrir())
   el('cancel-product').addEventListener('click', fechar)
   el('cancel-delete-product').addEventListener('click', cancelarExclusao)
-  el('confirm-delete-product').addEventListener('click', () => {
-    if (excluindo === null || !service) return
+  el('confirm-delete-product').addEventListener('click', async () => {
+    if (excluindo === null) return
+    const origem = sessao
+    const button = el<HTMLButtonElement>('confirm-delete-product')
+    button.disabled = true
     try {
-      service.excluir(excluindo)
-      if (editando === excluindo) fechar()
-      cancelarExclusao(); render(); status('Produto excluído do catálogo local.')
-    } catch (error) { status(mensagem(error), true) }
+      await api.excluirProduto(excluindo)
+      if (origem !== sessao) return
+      if (editando?.id === excluindo) fechar()
+      cancelarExclusao(); status('Produto excluído.'); await atualizar()
+    } catch (error) { if (origem === sessao) status(mensagem(error), true) }
+    finally { button.disabled = false }
   })
   el('product-search').addEventListener('input', render)
   el('product-filter').addEventListener('change', render)
   el('refresh-exchange').addEventListener('click', () => void atualizarCotacao())
 
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault()
-    if (!form.reportValidity() || !service) return
+    const button = form.querySelector<HTMLButtonElement>('button[type=submit]')!
+    if (!form.reportValidity() || button.disabled) return
+    const origem = sessao
+    button.disabled = true
     try {
       const data = new FormData(form)
       const input = {
@@ -80,35 +76,18 @@ export function iniciarCatalogo(
         moeda: String(data.get('moeda')) as 'BRL' | 'USD', preco: Number(data.get('preco')),
         importado: data.has('importado'), estoque: Number(data.get('estoque'))
       }
-      if (editando !== null) service.atualizar(editando, input)
-      else service.criar(input)
-      fechar(); render(); status('Produto salvo no catálogo local.')
-    } catch (error) { status(mensagem(error), true) }
+      if (editando) await api.atualizarProduto(editando.id, input, editando.estoque)
+      else await api.criarProduto(input)
+      if (origem !== sessao) return
+      fechar(); status('Produto salvo.'); await atualizar()
+    } catch (error) { if (origem === sessao) status(mensagem(error), true) }
+    finally { button.disabled = false }
   })
-
-  function navegar(): void {
-    cancelarExclusao()
-    const aberto = autenticado || demonstracao
-    el('login-view').classList.toggle('d-none', aberto)
-    el('clients-view').classList.toggle('d-none', !autenticado || tela !== 'clientes')
-    el('catalog-navigation').classList.toggle('d-none', !aberto)
-    el('catalog-content').classList.toggle('d-none', !aberto || tela === 'clientes')
-    el('catalog-dashboard').classList.toggle('d-none', tela !== 'dashboard')
-    el('catalog-products').classList.toggle('d-none', tela !== 'produtos')
-    el('nav-clientes').classList.toggle('d-none', !autenticado)
-    el('exit-demo').classList.toggle('d-none', autenticado)
-    document.querySelectorAll<HTMLButtonElement>('[data-screen]').forEach((button) => {
-      const ativo = button.dataset.screen === tela
-      button.classList.toggle('active', ativo)
-      if (ativo) button.setAttribute('aria-current', 'page')
-      else button.removeAttribute('aria-current')
-    })
-  }
 
   function abrir(produto?: Produto): void {
     cancelarExclusao()
     form.reset()
-    editando = produto?.id ?? null
+    editando = produto ?? null
     el('product-form-title').textContent = produto ? 'Editar produto e estoque' : 'Novo produto'
     if (produto) {
       el<HTMLInputElement>('product-name').value = produto.nome
@@ -130,7 +109,6 @@ export function iniciarCatalogo(
   }
 
   function render(): void {
-    const produtos = service?.listar() ?? []
     const taxa = cotacao.cotacao?.taxa ?? null
     const busca = el<HTMLInputElement>('product-search').value.trim().toLocaleLowerCase('pt-BR')
     const categoria = el<HTMLSelectElement>('product-filter').value
@@ -150,9 +128,10 @@ export function iniciarCatalogo(
       }
       const acoes = document.createElement('td')
       acoes.className = 'text-end text-nowrap'
-      acoes.append(botao('Editar', 'secondary', () => abrir(produto)), botao('Excluir', 'danger', () => {
+      acoes.append(botao('Editar', 'secondary', () => abrir(produto)))
+      if (podeExcluir) acoes.append(botao('Excluir', 'danger', () => {
         excluindo = produto.id
-        el('product-delete-message').textContent = `Excluir ${produto.nome} do catálogo local? Esta ação não pode ser desfeita.`
+        el('product-delete-message').textContent = `Excluir ${produto.nome} do catálogo? Esta ação não pode ser desfeita.`
         el('product-delete-confirmation').classList.remove('d-none')
         el('confirm-delete-product').focus()
       }))
@@ -194,7 +173,10 @@ export function iniciarCatalogo(
     const button = el<HTMLButtonElement>('refresh-exchange'); button.disabled = true
     el('exchange-status').textContent = 'Consultando cotação...'
     try {
-      cotacao = await exchange.atualizar()
+      const origem = sessao
+      const resultado = await api.atualizarCotacao()
+      if (origem !== sessao) return
+      cotacao = resultado
       el('exchange-value').textContent = cotacao.cotacao ? `US$ 1 = ${dinheiro(cotacao.cotacao.taxa, 'BRL', 4)}` : 'Cotação indisponível'
       el('exchange-status').textContent = `${cotacao.mensagem}${cotacao.cotacao ? ` Data da cotação: ${new Date(cotacao.cotacao.atualizadaEm).toLocaleString('pt-BR')}.` : ''} Conversão de referência, sem impostos ou taxas.`
       el('exchange-status').className = `small mb-0 ${cotacao.emCache || !cotacao.cotacao ? 'text-warning-emphasis' : 'text-secondary'}`
@@ -209,8 +191,27 @@ export function iniciarCatalogo(
 
   render()
   return {
-    atualizarSessao(value) {
-      autenticado = value; demonstracao = false; tela = 'dashboard'; fechar(); navegar(); render()
+    mostrar(tela: string, admin: boolean) {
+      podeExcluir = admin
+      fechar()
+      cancelarExclusao()
+      const aberto = tela === 'dashboard' || tela === 'produtos'
+      el('catalog-content').classList.toggle('d-none', !aberto)
+      el('catalog-dashboard').classList.toggle('d-none', tela !== 'dashboard')
+      el('catalog-products').classList.toggle('d-none', tela !== 'produtos')
+      if (aberto) void atualizar()
+    },
+    encerrar() {
+      sessao++
+      versaoLista++
+      produtos = []
+      cotacao = { cotacao: null, emCache: false, mensagem: '' }
+      el('exchange-value').textContent = 'Cotação não consultada'
+      el('exchange-status').textContent = ''
+      el<HTMLInputElement>('product-search').value = ''
+      el<HTMLSelectElement>('product-filter').value = ''
+      status('')
+      render()
     }
   }
 }
@@ -233,5 +234,5 @@ function dinheiro(valor: number | null, moeda: 'BRL' | 'USD', casas = 2): string
 }
 
 function mensagem(error: unknown): string {
-  return error instanceof Error ? error.message : 'Não foi possível salvar. Verifique o armazenamento local.'
+  return error instanceof Error ? error.message : 'Não foi possível salvar. Tente novamente.'
 }

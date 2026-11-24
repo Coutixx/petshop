@@ -3,16 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f4f6f8" />
+    <meta name="theme-color" content="#175844" />
+    <link rel="icon" href="../../resources/icon.png" />
     <title>PetShop Cotil</title>
   </head>
-  <body class="bg-light">
+  <body class="signed-out">
     <main class="container py-4 py-lg-5">
-      <header class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
-        <div>
-          <p class="text-uppercase text-secondary small fw-semibold mb-1">PetShop Cotil</p>
-          <h1 class="h4 mb-0">Gestão da loja</h1>
-        </div>
+      <header class="app-header align-items-center justify-content-between mb-3">
+        <div class="brand"><img src="../../resources/icon.png" alt="" />PetShop Cotil</div>
         <div id="session-actions" class="d-none align-items-center gap-3">
           <span id="session-user" class="small text-secondary"></span>
           <button id="logout" class="btn btn-outline-secondary btn-sm" type="button">Sair</button>
@@ -20,16 +18,18 @@
       </header>
 
       <nav id="app-nav" class="d-none gap-2 mb-4" aria-label="Navegação principal">
-        <button id="nav-checkout" class="btn btn-primary btn-sm" type="button">Checkout</button>
-        <button id="nav-clients" class="btn btn-outline-secondary btn-sm" type="button">Clientes</button>
-        <button id="nav-history" class="btn btn-outline-secondary btn-sm" type="button">Histórico</button>
+        <button class="nav-tab" type="button" data-screen="dashboard">Visão geral</button>
+        <button class="nav-tab" type="button" data-screen="produtos">Produtos e estoque</button>
+        <button class="nav-tab" type="button" data-screen="clientes">Clientes</button>
+        <button class="nav-tab" type="button" data-screen="checkout">Caixa</button>
+        <button class="nav-tab" type="button" data-screen="historico">Histórico</button>
       </nav>
 
       <p id="app-status" class="small mb-3" role="status" aria-live="polite"></p>
 
-      <section id="login-view" class="mx-auto" style="max-width: 440px">
-        <h2 class="h5 mb-1">Entrar</h2>
-        <p class="text-secondary mb-4">Use sua conta de acesso ao sistema.</p>
+      <section id="login-view" class="mx-auto" aria-labelledby="login-title">
+        <div class="brand mb-4"><img src="../../resources/icon.png" alt="" />PetShop Cotil</div>
+        <h1 id="login-title" class="h3 mb-4">Entrar na sua conta</h1>
         <form id="login-form" class="vstack gap-3">
           <div>
             <label for="login-email" class="form-label">E-mail</label>
@@ -39,12 +39,8 @@
             <label for="login-password" class="form-label">Senha</label>
             <input id="login-password" name="senha" class="form-control" type="password" autocomplete="current-password" required />
           </div>
-          <button id="login-submit" class="btn btn-primary align-self-start" type="submit">Entrar</button>
+          <button id="login-submit" class="btn btn-primary w-100" type="submit">Entrar</button>
         </form>
-        <div class="d-flex flex-wrap align-items-center gap-3 border-top mt-4 pt-3">
-          <button id="test-db" class="btn btn-outline-secondary btn-sm" type="button">Testar conexão MySQL</button>
-          <span id="db-status" class="small text-secondary" role="status" aria-live="polite">Conexão ainda não testada.</span>
-        </div>
       </section>
 
       <section id="clients-view" class="d-none" aria-labelledby="clients-title">
@@ -135,20 +131,19 @@
       <section id="checkout-view" class="d-none" aria-labelledby="checkout-title">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
-            <h2 id="checkout-title" class="h5 mb-1">Checkout</h2>
-            <p class="text-secondary small mb-0">Monte o carrinho e revise a entrega antes de fechar o rascunho.</p>
+            <h2 id="checkout-title" class="h5 mb-1">Caixa</h2>
+            <p class="text-secondary small mb-0">Monte o carrinho e revise a entrega antes de confirmar a venda.</p>
           </div>
-          <button id="show-clients" class="btn btn-outline-secondary" type="button">Gestão de clientes</button>
         </div>
         <div class="row g-4">
           <div class="col-lg-7">
-            <h3 class="h6">Produtos de teste</h3>
-            <p id="products-source" class="text-secondary small">Catálogo local de teste até a API IPC de produtos estar disponível.</p>
+            <h3 class="h6">Produtos disponíveis</h3>
+            <p id="products-source" class="text-secondary small"></p>
             <div id="checkout-products" class="row g-3"></div>
             <div class="border-top mt-4 pt-4">
               <div class="d-flex justify-content-between align-items-center">
                 <h3 class="h6 mb-0">Entregadores</h3>
-                <span id="deliverers-source" class="badge text-bg-secondary">dados locais de teste</span>
+                <span id="deliverers-source" class="small text-secondary" role="status"></span>
               </div>
               <form id="deliverer-form" class="row g-2 mt-2">
                 <div class="col-md-4"><label class="visually-hidden" for="deliverer-name">Nome</label><input id="deliverer-name" class="form-control" placeholder="Nome" required maxlength="100" /></div>
@@ -172,8 +167,9 @@
                 <div class="d-flex justify-content-between fs-5"><span>Total</span><strong id="checkout-total">R$ 0,00</strong></div>
               </div>
               <button id="calculate-delivery" class="btn btn-outline-primary w-100 mt-3" type="button">Calcular distância e frete</button>
-              <p id="distance-note" class="form-text mb-0 mt-2">A rota usa STORE_ADDRESS do .env e o endereço cadastrado do cliente. Geocodificação e rotas © OpenStreetMap contributors.</p>
-              <button id="create-order" class="btn btn-primary w-100 mt-3" type="button" disabled>Criar rascunho do pedido</button>
+              <p id="distance-note" class="form-text mb-0 mt-2"></p>
+              <small class="text-secondary">Rotas © OpenStreetMap contributors</small>
+              <button id="create-order" class="btn btn-primary w-100 mt-3" type="button" disabled>Confirmar venda</button>
               <p id="order-preview" class="small text-success mt-3 mb-0" role="status" aria-live="polite"></p>
             </div></div>
           </div>
@@ -193,6 +189,11 @@
       </section>
 
       <footer class="border-top mt-5 pt-3">
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+          <button id="test-db" class="btn btn-outline-secondary btn-sm" type="button">Testar conexão MySQL</button>
+          <span id="db-status" class="small text-secondary" role="status" aria-live="polite"></span>
+        </div>
+
         <span id="app-version" class="text-secondary small">Carregando versão...</span>
       </footer>
     </main>
