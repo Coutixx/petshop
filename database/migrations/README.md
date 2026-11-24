@@ -1,7 +1,8 @@
-As migrations MySQL ficam ordenadas pelo prefixo numérico. `001-inicial.sql` cria as seis tabelas base; aplique-a uma vez no banco da equipe antes de executar o seed. O checkout também exige `002-entregadores.sql`; consulte [configuração do checkout](002-entregadores.md).
+Aplique os arquivos SQL uma vez, em ordem, antes do seed. Em um banco existente, execute apenas as migrações pendentes.
 
-- Aplique `001-inicial.sql` uma vez para criar as seis tabelas base.
-- Aplique `002-entregadores.sql` para adicionar veículo e disponibilidade ao cadastro.
+1. [001-inicial.sql](001-inicial.sql) cria as seis tabelas InnoDB.
+2. [002-entregadores.sql](002-entregadores.sql) adiciona veículo e disponibilidade.
+3. [003-catalogo.sql](003-catalogo.sql) explicita a moeda de origem e permite arquivar produtos vinculados a vendas passadas. Os produtos existentes mantêm o preço de venda em reais.
 
 ```mermaid
 erDiagram
