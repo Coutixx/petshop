@@ -135,7 +135,7 @@ export interface DesktopApi {
   criarEntregador(input: EntregadorInput): Promise<EntregadorResumo>
   atualizarEntregador(id: number, input: EntregadorInput): Promise<EntregadorResumo>
   excluirEntregador(id: number): Promise<void>
-  calcularDistancia(destino: string): Promise<RotaCalculada>
+  calcularDistancia(clienteId: number): Promise<RotaCalculada>
   criarPedido(input: CriarPedidoInput): Promise<PedidoRegistrado>
   listarPedidos(): Promise<PedidoRegistrado[]>
 }

@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron'
-import type { ClienteInput, CriarPedidoInput, EntregadorInput, UsuarioAutenticado } from '../../shared/contracts'
+import type { ClienteInput, CriarPedidoInput, EntregadorInput, RotaCalculada, UsuarioAutenticado } from '../../shared/contracts'
 import { testMySqlConnection } from '../database/connection'
 import { MySqlClienteRepository } from '../modules/clientes/cliente-repository'
 import { ClienteNaoEncontradoError, ClienteService, EntradaInvalidaError } from '../modules/clientes/cliente-service'
@@ -20,7 +20,8 @@ type SafeHandler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => u
 
 export function registerAppHandlers(): void {
   const usuarioService = new UsuarioService(new MySqlUsuarioRepository())
-  const clienteService = new ClienteService(new MySqlClienteRepository())
+  const clienteRepository = new MySqlClienteRepository()
+  const clienteService = new ClienteService(clienteRepository)
   const viaCepService = new ViaCepService()
   const distanceService = new DistanceService()
   const produtoRepository = new ProdutoRepository()
@@ -28,6 +29,23 @@ export function registerAppHandlers(): void {
   let cambio = new CotacaoService()
   const pedidoService = new PedidoService(new PedidoRepository(() => cambio.taxa))
   let usuarioAtual: UsuarioAutenticado | null = null
+
+  let ultimaRota: { clienteId: number; endereco: string; rota: RotaCalculada } | null = null
+  let consultaRota = 0
+
+  function encerrarSessao(): void {
+    usuarioAtual = null
+    cambio = new CotacaoService()
+    ultimaRota = null
+    consultaRota++
+  }
+  app.on('browser-window-created', (_event, window) => window.once('closed', encerrarSessao))
+
+  async function enderecoEntrega(id: number): Promise<string> {
+    const cliente = await clienteRepository.buscarPorId(id)
+    if (!cliente) throw new ClienteNaoEncontradoError()
+    return [cliente.logradouro, cliente.numero, cliente.bairro, cliente.cidade + ' - ' + cliente.uf, cliente.cep, 'Brasil'].join(', ')
+  }
 
   ipcMain.handle('app:get-version', () => app.getVersion())
   handleSafely('database:test-connection', async () => {
@@ -46,16 +64,16 @@ export function registerAppHandlers(): void {
   })
 
   handleSafely('usuarios:login', async (_event, email, senha) => {
-    usuarioAtual = await usuarioService.autenticar(
+    encerrarSessao()
+    const usuario = await usuarioService.autenticar(
       typeof email === 'string' ? email : '',
       typeof senha === 'string' ? senha : ''
     )
+    if (_event.sender.isDestroyed()) throw new NaoAutorizadoError()
+    usuarioAtual = usuario
     return usuarioAtual
   })
-  handleSafely('usuarios:logout', () => {
-    usuarioAtual = null
-    cambio = new CotacaoService()
-  })
+  handleSafely('usuarios:logout', encerrarSessao)
   handleSafely('usuarios:atual', () => usuarioAtual)
 
   handleSafely('clientes:listar', () => {
@@ -78,9 +96,17 @@ export function registerAppHandlers(): void {
     exigirLogin(usuarioAtual)
     return viaCepService.consultar(typeof cep === 'string' ? cep : '')
   })
-  handleSafely('distancia:calcular', (_event, destino) => {
+  handleSafely('distancia:calcular', async (_event, clienteId) => {
     exigirLogin(usuarioAtual)
-    return distanceService.calcularRotaPorEndereco(typeof destino === 'string' ? destino : '')
+    if (typeof clienteId !== 'number' || !Number.isSafeInteger(clienteId) || clienteId < 1) {
+      throw new EntradaInvalidaError('Selecione um cliente.')
+    }
+    const consulta = ++consultaRota
+    ultimaRota = null
+    const endereco = await enderecoEntrega(clienteId)
+    const rota = await distanceService.calcularRotaPorEndereco(endereco)
+    if (consulta === consultaRota) ultimaRota = { clienteId, endereco, rota }
+    return rota
   })
   handleSafely('produtos:catalogo', () => {
     exigirLogin(usuarioAtual)
@@ -122,9 +148,16 @@ export function registerAppHandlers(): void {
     exigirAdmin(usuarioAtual)
     return entregadorService.excluir(typeof id === 'number' ? id : Number.NaN)
   })
-  handleSafely('pedidos:criar', (_event, input) => {
+  handleSafely('pedidos:criar', async (_event, input) => {
     exigirLogin(usuarioAtual)
-    return pedidoService.criar(input as CriarPedidoInput)
+    const pedido = input as CriarPedidoInput
+    const cotacao = ultimaRota
+    if (!cotacao || cotacao.clienteId !== pedido?.clienteId ||
+        await enderecoEntrega(cotacao.clienteId) !== cotacao.endereco || ultimaRota !== cotacao) {
+      throw new PedidoEntradaInvalidaError('Calcule a rota para o endereço atual do cliente.')
+    }
+    ultimaRota = null
+    return pedidoService.criar({ ...pedido, ...cotacao.rota })
   })
   handleSafely('pedidos:listar', () => {
     exigirLogin(usuarioAtual)

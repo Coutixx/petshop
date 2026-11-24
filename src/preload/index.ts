@@ -22,7 +22,7 @@ const api: DesktopApi = {
   criarEntregador: (input) => ipcRenderer.invoke('entregadores:criar', input),
   atualizarEntregador: (id, input) => ipcRenderer.invoke('entregadores:atualizar', id, input),
   excluirEntregador: (id) => ipcRenderer.invoke('entregadores:excluir', id),
-  calcularDistancia: (destino) => ipcRenderer.invoke('distancia:calcular', destino),
+  calcularDistancia: (clienteId) => ipcRenderer.invoke('distancia:calcular', clienteId),
   criarPedido: (input) => ipcRenderer.invoke('pedidos:criar', input),
   listarPedidos: () => ipcRenderer.invoke('pedidos:listar')
 }

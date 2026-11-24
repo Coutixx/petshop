@@ -108,7 +108,7 @@ function isRouteResponse(value: unknown): value is { code: string; routes: Array
   return candidate.routes.every((route: unknown) => {
     if (typeof route !== 'object' || route === null) return false
     const item = route as { distance?: unknown; duration?: unknown }
-    return typeof item.distance === 'number' && Number.isFinite(item.distance) &&
-      typeof item.duration === 'number' && Number.isFinite(item.duration)
+    return typeof item.distance === 'number' && Number.isFinite(item.distance) && item.distance >= 0 &&
+      typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration >= 0
   })
 }
