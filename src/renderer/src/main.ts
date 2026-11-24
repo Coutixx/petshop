@@ -19,7 +19,7 @@ import { produtosMock } from '../../mocks/produtosMock'
 import { entregadoresMock } from '../../mocks/entregadoresMock'
 import { CheckoutService } from '../../services/CheckoutService'
 
-const catalogo = iniciarCatalogo()
+const catalogo = iniciarCatalogo({ permitirDemonstracao: false })
 
 const version = requiredElement<HTMLElement>('#app-version')
 const testDatabaseButton = requiredElement<HTMLButtonElement>('#test-db')

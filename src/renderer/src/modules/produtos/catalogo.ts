@@ -6,7 +6,9 @@ import { produtosDemo } from '../../../../shared/domain/produtos/produtos-demo'
 import { CotacaoService, type ResultadoCotacao } from '../../../../shared/domain/produtos/cotacao-service'
 import { indicadoresEstoque } from '../../../../shared/domain/produtos/dashboard'
 
-export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void } {
+export function iniciarCatalogo(
+  options: { permitirDemonstracao?: boolean } = {}
+): { atualizarSessao(autenticado: boolean): void } {
   const host = document.createElement('div')
   // Apenas HTML estático do projeto; os dados do usuário são inseridos via textContent.
   host.innerHTML = markup
@@ -43,7 +45,15 @@ export function iniciarCatalogo(): { atualizarSessao(autenticado: boolean): void
       navegar()
     })
   })
-  el('demo-catalog').addEventListener('click', () => { demonstracao = true; tela = 'dashboard'; navegar(); render() })
+  const demoButton = document.getElementById('demo-catalog')
+  if (options.permitirDemonstracao !== false) {
+    demoButton?.addEventListener('click', () => {
+      demonstracao = true
+      tela = 'dashboard'
+      navegar()
+      render()
+    })
+  }
   el('exit-demo').addEventListener('click', () => { demonstracao = false; fechar(); navegar() })
   el('new-product').addEventListener('click', () => abrir())
   el('cancel-product').addEventListener('click', fechar)

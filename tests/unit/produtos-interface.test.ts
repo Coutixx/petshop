@@ -15,6 +15,14 @@ beforeEach(() => {
 })
 
 describe('interface de produtos e navegação', () => {
+  it('mantém o catálogo inacessível sem autenticação quando a demonstração é desabilitada', () => {
+    iniciarCatalogo({ permitirDemonstracao: false })
+    element('demo-catalog').click()
+    expect(element('login-view').classList.contains('d-none')).toBe(false)
+    expect(element('catalog-navigation').classList.contains('d-none')).toBe(true)
+    expect(element('catalog-content').classList.contains('d-none')).toBe(true)
+  })
+
   it('permite demonstração sem abrir clientes e restaura a navegação da sessão', () => {
     const catalogo = iniciarCatalogo()
     element('demo-catalog').click()
