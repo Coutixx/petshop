@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron'
-import type { ClienteInput, CriarPedidoInput, EntregadorInput, UsuarioAutenticado } from '../../shared/contracts'
+import type { ClienteInput, CriarPedidoInput, EntregadorInput, RotaCalculada, UsuarioAutenticado } from '../../shared/contracts'
 import { testMySqlConnection } from '../database/connection'
 import { MySqlClienteRepository } from '../modules/clientes/cliente-repository'
 import { ClienteNaoEncontradoError, ClienteService, EntradaInvalidaError } from '../modules/clientes/cliente-service'
@@ -8,7 +8,10 @@ import { MySqlUsuarioRepository } from '../modules/usuarios/usuario-repository'
 import { CredenciaisInvalidasError, UsuarioService } from '../modules/usuarios/usuario-service'
 import { ViaCepError, ViaCepService } from '../modules/viacep/viacep-service'
 import { DistanceApiError, DistanceService } from '../../services/DistanceService'
-import { ProdutoRepository } from '../modules/produtos/produto-repository'
+import type { ProdutoInput } from '../../shared/domain/produtos/produto'
+import { CotacaoService } from '../../shared/domain/produtos/cotacao-service'
+import { PedidoRepository } from '../modules/pedidos/pedido-repository'
+import { ProdutoOperacaoError, ProdutoRepository } from '../modules/produtos/produto-repository'
 import { EntregadorPersistenceService, EntregadorEntradaInvalidaError, EntregadorNaoEncontradoError } from '../modules/entregadores/entregador-persistence-service'
 import { PedidoEntradaInvalidaError, PedidoService } from '../modules/pedidos/pedido-service'
 import { PedidoOperacaoError } from '../modules/pedidos/pedido-errors'
@@ -17,16 +20,36 @@ type SafeHandler = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => u
 
 export function registerAppHandlers(): void {
   const usuarioService = new UsuarioService(new MySqlUsuarioRepository())
-  const clienteService = new ClienteService(new MySqlClienteRepository())
+  const clienteRepository = new MySqlClienteRepository()
+  const clienteService = new ClienteService(clienteRepository)
   const viaCepService = new ViaCepService()
   const distanceService = new DistanceService()
   const produtoRepository = new ProdutoRepository()
   const entregadorService = new EntregadorPersistenceService()
-  const pedidoService = new PedidoService()
+  let cambio = new CotacaoService()
+  const pedidoService = new PedidoService(new PedidoRepository(() => cambio.taxa))
   let usuarioAtual: UsuarioAutenticado | null = null
 
+  let ultimaRota: { clienteId: number; endereco: string; rota: RotaCalculada } | null = null
+  let consultaRota = 0
+
+  function encerrarSessao(): void {
+    usuarioAtual = null
+    cambio = new CotacaoService()
+    ultimaRota = null
+    consultaRota++
+  }
+  app.on('browser-window-created', (_event, window) => window.once('closed', encerrarSessao))
+
+  async function enderecoEntrega(id: number): Promise<string> {
+    const cliente = await clienteRepository.buscarPorId(id)
+    if (!cliente) throw new ClienteNaoEncontradoError()
+    return [cliente.logradouro, cliente.numero, cliente.bairro, cliente.cidade + ' - ' + cliente.uf, cliente.cep, 'Brasil'].join(', ')
+  }
+
   ipcMain.handle('app:get-version', () => app.getVersion())
-  ipcMain.handle('database:test-connection', async () => {
+  handleSafely('database:test-connection', async () => {
+    exigirLogin(usuarioAtual)
     try {
       await testMySqlConnection()
       return { ok: true, message: 'Conexão MySQL estabelecida.' }
@@ -41,15 +64,16 @@ export function registerAppHandlers(): void {
   })
 
   handleSafely('usuarios:login', async (_event, email, senha) => {
-    usuarioAtual = await usuarioService.autenticar(
+    encerrarSessao()
+    const usuario = await usuarioService.autenticar(
       typeof email === 'string' ? email : '',
       typeof senha === 'string' ? senha : ''
     )
+    if (_event.sender.isDestroyed()) throw new NaoAutorizadoError()
+    usuarioAtual = usuario
     return usuarioAtual
   })
-  handleSafely('usuarios:logout', () => {
-    usuarioAtual = null
-  })
+  handleSafely('usuarios:logout', encerrarSessao)
   handleSafely('usuarios:atual', () => usuarioAtual)
 
   handleSafely('clientes:listar', () => {
@@ -72,13 +96,41 @@ export function registerAppHandlers(): void {
     exigirLogin(usuarioAtual)
     return viaCepService.consultar(typeof cep === 'string' ? cep : '')
   })
-  handleSafely('distancia:calcular', (_event, destino) => {
+  handleSafely('distancia:calcular', async (_event, clienteId) => {
     exigirLogin(usuarioAtual)
-    return distanceService.calcularRotaPorEndereco(typeof destino === 'string' ? destino : '')
+    if (typeof clienteId !== 'number' || !Number.isSafeInteger(clienteId) || clienteId < 1) {
+      throw new EntradaInvalidaError('Selecione um cliente.')
+    }
+    const consulta = ++consultaRota
+    ultimaRota = null
+    const endereco = await enderecoEntrega(clienteId)
+    const rota = await distanceService.calcularRotaPorEndereco(endereco)
+    if (consulta === consultaRota) ultimaRota = { clienteId, endereco, rota }
+    return rota
+  })
+  handleSafely('produtos:catalogo', () => {
+    exigirLogin(usuarioAtual)
+    return produtoRepository.listar()
+  })
+  handleSafely('produtos:criar', (_event, input) => {
+    exigirLogin(usuarioAtual)
+    return produtoRepository.criar(input as ProdutoInput)
+  })
+  handleSafely('produtos:atualizar', (_event, id, input, estoqueAnterior) => {
+    exigirLogin(usuarioAtual)
+    return produtoRepository.atualizar(Number(id), input as ProdutoInput, Number(estoqueAnterior))
+  })
+  handleSafely('produtos:excluir', (_event, id) => {
+    exigirAdmin(usuarioAtual)
+    return produtoRepository.excluir(Number(id))
+  })
+  handleSafely('produtos:cotacao', () => {
+    exigirLogin(usuarioAtual)
+    return cambio.atualizar()
   })
   handleSafely('produtos:listar', () => {
     exigirLogin(usuarioAtual)
-    return produtoRepository.listarDisponiveis()
+    return produtoRepository.listarDisponiveis(cambio.taxa)
   })
   handleSafely('entregadores:listar', () => {
     exigirLogin(usuarioAtual)
@@ -88,17 +140,24 @@ export function registerAppHandlers(): void {
     exigirLogin(usuarioAtual)
     return entregadorService.criar(input as EntregadorInput)
   })
-  handleSafely('entregadores:atualizar', (_event, id, input) => {
+  handleSafely('entregadores:atualizar', (_event, id, input, anterior) => {
     exigirLogin(usuarioAtual)
-    return entregadorService.atualizar(typeof id === 'number' ? id : Number.NaN, input as EntregadorInput)
+    return entregadorService.atualizar(typeof id === 'number' ? id : Number.NaN, input as EntregadorInput, anterior as EntregadorInput | undefined)
   })
   handleSafely('entregadores:excluir', (_event, id) => {
     exigirAdmin(usuarioAtual)
     return entregadorService.excluir(typeof id === 'number' ? id : Number.NaN)
   })
-  handleSafely('pedidos:criar', (_event, input) => {
+  handleSafely('pedidos:criar', async (_event, input) => {
     exigirLogin(usuarioAtual)
-    return pedidoService.criar(input as CriarPedidoInput)
+    const pedido = input as CriarPedidoInput
+    const cotacao = ultimaRota
+    if (!cotacao || cotacao.clienteId !== pedido?.clienteId ||
+        await enderecoEntrega(cotacao.clienteId) !== cotacao.endereco || ultimaRota !== cotacao) {
+      throw new PedidoEntradaInvalidaError('Calcule a rota para o endereço atual do cliente.')
+    }
+    ultimaRota = null
+    return pedidoService.criar({ ...pedido, ...cotacao.rota })
   })
   handleSafely('pedidos:listar', () => {
     exigirLogin(usuarioAtual)
@@ -117,7 +176,7 @@ function handleSafely(channel: string, handler: SafeHandler): void {
         error instanceof NaoAutorizadoError || error instanceof DistanceApiError
         || error instanceof EntregadorEntradaInvalidaError || error instanceof EntregadorNaoEncontradoError
         || error instanceof PedidoEntradaInvalidaError
-        || error instanceof PedidoOperacaoError
+        || error instanceof ProdutoOperacaoError || error instanceof PedidoOperacaoError
       ) {
         throw new Error(error.message)
       }

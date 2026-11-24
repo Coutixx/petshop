@@ -30,6 +30,7 @@ const connection = await mysql.createConnection({
 })
 
 try {
+  await connection.beginTransaction()
   const [adminResult] = await connection.execute(
     `INSERT IGNORE INTO usuarios (nome, email, senha_hash, nivel)
      VALUES (?, ?, ?, 'admin')`,
@@ -37,8 +38,8 @@ try {
   )
 
   const demoClients = [
-    ['Cliente Demonstração', 'cliente.demo@local.invalid', '(19) 3000-0000', '13083000', 'Rua de Exemplo', '100', 'Centro', 'Campinas', 'SP'],
-    ['Ana de Teste', 'ana.teste@local.invalid', '(19) 3000-0001', '13083001', 'Avenida de Exemplo', '200', 'Jardim Demo', 'Campinas', 'SP']
+    ['Cliente Demonstração', 'cliente.demo@local.invalid', '(19) 3000-0000', '13013082', 'Rua Barreto Leme', '1100', 'Centro', 'Campinas', 'SP'],
+    ['Ana de Teste', 'ana.teste@local.invalid', '(19) 3000-0001', '13015081', 'Avenida Francisco Glicério', '1000', 'Centro', 'Campinas', 'SP']
   ]
 
   for (const [name, email, phone, postalCode, street, number, neighborhood, city, state] of demoClients) {
@@ -50,10 +51,31 @@ try {
     )
   }
 
+  const produtos = [
+    ['Ração para cães adultos', 'Alimentação', 49.90, 18],
+    ['Shampoo neutro', 'Higiene', 22.50, 4],
+    ['Bola de borracha', 'Brinquedos', 12, 0]
+  ]
+  for (const [nome, categoria, preco, estoque] of produtos) {
+    await connection.execute(
+      `INSERT INTO produtos (nome, categoria, preco_brl, quantidade_estoque)
+       SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM produtos WHERE nome = ?)`,
+      [nome, categoria, preco, estoque, nome]
+    )
+  }
+  await connection.execute(
+    `INSERT INTO entregadores (nome, telefone, veiculo)
+     SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM entregadores WHERE telefone = ?)`,
+    ['Entregador de demonstração', '19900000002', 'Bicicleta', '19900000002']
+  )
+  await connection.commit()
   console.log(adminResult.affectedRows === 1
     ? 'Administrador de demonstração criado.'
     : 'Administrador já existente; senha mantida.')
-  console.log('Clientes de demonstração verificados.')
+  console.log('Clientes, produtos e entregador de demonstração verificados.')
+} catch (error) {
+  await connection.rollback()
+  throw error
 } finally {
   await connection.end()
 }

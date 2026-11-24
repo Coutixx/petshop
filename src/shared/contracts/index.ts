@@ -1,3 +1,6 @@
+import type { Produto, ProdutoInput } from '../domain/produtos/produto'
+import type { ResultadoCotacao } from '../domain/produtos/cotacao-service'
+
 export interface ClienteResumo {
   id: number
   nome: string
@@ -67,6 +70,7 @@ export interface RotaCalculada {
 }
 
 export interface ItemPedidoRascunho {
+  precoEsperado?: number
   produtoId: number
   quantidade: number
 }
@@ -121,12 +125,17 @@ export interface DesktopApi {
   atualizarCliente(id: number, input: ClienteInput): Promise<Cliente>
   excluirCliente(id: number): Promise<void>
   consultarCep(cep: string): Promise<EnderecoViaCep>
+  listarCatalogo(): Promise<Produto[]>
+  criarProduto(input: ProdutoInput): Promise<void>
+  atualizarProduto(id: number, input: ProdutoInput, estoqueAnterior: number): Promise<void>
+  excluirProduto(id: number): Promise<void>
+  atualizarCotacao(): Promise<ResultadoCotacao>
   listarProdutos(): Promise<ProdutoResumo[]>
   listarEntregadores(): Promise<EntregadorResumo[]>
   criarEntregador(input: EntregadorInput): Promise<EntregadorResumo>
-  atualizarEntregador(id: number, input: EntregadorInput): Promise<EntregadorResumo>
+  atualizarEntregador(id: number, input: EntregadorInput, anterior?: EntregadorInput): Promise<EntregadorResumo>
   excluirEntregador(id: number): Promise<void>
-  calcularDistancia(destino: string): Promise<RotaCalculada>
+  calcularDistancia(clienteId: number): Promise<RotaCalculada>
   criarPedido(input: CriarPedidoInput): Promise<PedidoRegistrado>
   listarPedidos(): Promise<PedidoRegistrado[]>
 }

@@ -16,6 +16,8 @@ export class CotacaoService {
   // A função nativa do navegador não pode receber o serviço como `this`.
   constructor(private readonly consultar: typeof fetch = (input, init) => fetch(input, init)) {}
 
+  get taxa(): number | null { return this.ultima?.taxa ?? null }
+
   async atualizar(): Promise<ResultadoCotacao> {
     try {
       const response = await this.consultar('https://economia.awesomeapi.com.br/json/last/USD-BRL', {

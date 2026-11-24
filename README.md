@@ -4,7 +4,7 @@ Aplicativo desktop para gerenciamento de um PetShop, desenvolvido para a discipl
 
 ## Tecnologias e arquitetura
 
-Electron, TypeScript, MySQL da escola e Bootstrap. A aplicação seguirá este fluxo:
+Electron, TypeScript, MySQL da escola e Bootstrap. A aplicação segue este fluxo:
 
 ```text
 Interface (renderer) -> preload tipado -> IPC (main) -> service/repository -> MySQL
@@ -31,36 +31,55 @@ No processo principal, os handlers IPC acionam os Services, que executam as regr
 
 ## Configuração local
 
-Requisitos: Node.js 20 ou superior, npm e acesso à rede do servidor MySQL da escola. O acesso fora do laboratório pode depender da rede ou VPN da escola.
+Use Node.js 24 LTS, npm e um banco MySQL com suporte a InnoDB. O servidor da escola pode exigir a rede do laboratório ou VPN. Para desenvolvimento, também é possível apontar o aplicativo para um banco de teste.
 
 ```powershell
-Copy-Item .env.example .env # somente na primeira configuração; não sobrescreva um .env já preenchido
-npm install
+Copy-Item .env.example .env # apenas na primeira configuração
+npm ci
 ```
 
-Edite o arquivo `.env` local e preencha `DB_NAME`, `DB_USER` e `DB_PASSWORD` com os dados fornecidos pela escola. `DB_HOST` e `DB_PORT` já apontam para o servidor da escola. Não compartilhe o `.env`.
+1. Preencha `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e `DB_PASSWORD` no `.env`. Configure `STORE_ADDRESS` com rua, número, cidade, UF e país da loja. O caixa usa esse endereço para calcular o frete.
+2. Aplique, em ordem, as migrações que faltarem, usando um cliente MySQL. A primeira cria as seis tabelas, a segunda adiciona veículo e disponibilidade ao entregador, e a terceira habilita o catálogo em BRL e USD. Em uma instalação existente, confira quais já foram aplicadas. [Migrações e diagrama](database/migrations/README.md)
+3. Defina `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD` (mínimo de 12 caracteres). Execute `npm run db:seed` para criar o administrador, dois clientes, três produtos e um entregador de demonstração. Repetir o seed preserva a senha e os estoques já cadastrados.
+4. Inicie com `npm run dev`. Entre com a conta do seed. O diagnóstico **Testar conexão MySQL** fica no rodapé da área autenticada.
 
-Antes do primeiro uso, execute `database/migrations/001-inicial.sql` no banco da escola usando um cliente MySQL autorizado, como uma extensão do VS Code com suporte a MySQL ou o MySQL Workbench. A migration não é executada automaticamente pelo aplicativo. Para criar um administrador e clientes demonstrativos, defina `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD` no `.env` (senha com pelo menos 12 caracteres) e execute `npm run db:seed`. O seed pode ser repetido; não redefine a senha de uma conta já existente.
+O `.env` é local. Cada integrante usa suas credenciais ou a conta do projeto fornecida pela escola.
 
-Depois que a migration e o seed terminarem com sucesso, execute `npm run dev` e entre com o e-mail e a senha definidos no seed. Na tela inicial, clique em **Testar conexão MySQL** para confirmar o acesso; o teste não exibe nem salva a senha na interface. Administradores podem excluir clientes; atendentes podem consultar, cadastrar e editar. A busca de endereço via CEP requer acesso à internet.
+## Operação da loja
 
-O `.env` está ignorado pelo Git. Nunca o envie no chat, no repositório ou dentro do instalador. Cada integrante precisa usar suas próprias credenciais, a menos que o professor forneça uma conta específica para o projeto.
+- **Visão geral** mostra quantidade de produtos, unidades, valor do estoque e itens a repor. De uma a cinco unidades indicam estoque baixo. A venda exige estoque positivo.
+- **Produtos e estoque** permite cadastrar, editar, pesquisar e filtrar produtos. O preço original fica em BRL ou USD. **Atualizar cotação** busca a taxa de venda USD/BRL da AwesomeAPI. A interface informa a data e qualquer uso da última taxa da sessão. Sem cotação, os produtos em dólar aguardam conversão e o valor do estoque aparece como parcial.
+- **Clientes** reúne o cadastro e a busca de endereço por CEP. Atendentes podem consultar, cadastrar e editar. A exclusão de clientes, produtos e entregadores exige uma conta de administrador.
+- **Caixa** reúne produtos e entregadores à esquerda e o carrinho à direita. Adicione itens, escolha o cliente e, se necessário, um entregador disponível. **Calcular distância e frete** consulta o endereço do cliente via Nominatim e calcula a rota com OSRM. O frete custa R$ 5 até 3 km, R$ 10 até 8 km, R$ 15 até 15 km e mais R$ 1 por quilômetro excedente. Em caso de falha de rota, confira o endereço e repita o cálculo.
+- **Confirmar venda** revalida preço, estoque, endereço e disponibilidade do entregador. A mesma transação grava pedido e itens, baixa o estoque e reserva o entregador. Quando ele voltar, clique em **Indisponível** na lista para liberá-lo.
+- **Histórico** permite abrir e imprimir o recibo de cada venda. O preço unitário é o registrado no fechamento. O envio de e-mail é simulado para a disciplina. Uma falha no envio mantém a venda confirmada.
 
-## Produtos e dashboard local — Júlia
+### Wireframe do caixa
 
-Após `npm run dev`, use **Explorar produtos e dashboard de demonstração** na tela de login para testar o catálogo sem autenticação MySQL. Esse acesso abre somente dados locais de produtos; não libera clientes nem operações do banco. Após o login normal, a navegação também permite alternar entre dashboard, produtos e clientes.
+| Produtos e entrega | Carrinho |
+| --- | --- |
+| Produtos disponíveis e botão Adicionar | Seleção de cliente e entregador |
+| Cadastro e edição do entregador | Itens, quantidades e subtotal |
+| Lista e disponibilidade dos entregadores | Frete, total e confirmação da venda |
 
-O catálogo começa com seis exemplos e salva alterações no armazenamento local do aplicativo (`petshop.julia.produtos.v1`). É uma demonstração compartilhada pelas sessões desse aplicativo no computador, não um banco de produção. Cadastro, edição, exclusão, pesquisa e filtro por categoria atualizam os indicadores. Use **Editar** para alterar a quantidade em estoque. Estoque zero indica indisponibilidade; de uma a cinco unidades indica estoque baixo. Se os dados locais estiverem corrompidos ou o armazenamento não puder ser aberto, o aplicativo informa a falha e preserva os dados existentes.
+[Tela do caixa com cliente, estoque e entregador de demonstração](docs/caixa.png)
 
-Cada produto mantém seu preço na moeda de origem (BRL ou USD); a marcação de importado é independente da moeda. Clique em **Atualizar cotação** para consultar USD/BRL pela [AwesomeAPI](https://docs.awesomeapi.com.br/api-de-moedas), usando a taxa de venda `ask` e a data informada pelo provedor. As conversões arredondam para centavos e não incluem impostos ou taxas. Se a consulta falhar, a última cotação válida desta sessão permanece identificada com um aviso e sua data. Sem uma consulta válida, os preços convertidos ficam indisponíveis e o dashboard identifica o valor de estoque como parcial.
+## Build e validação
 
-As regras estão em `src/shared/domain/produtos`; a interface está em `src/renderer/src/modules/produtos`. `ProdutoService.listarResumos(taxa)` entrega o contrato `ProdutoResumo` com preços em BRL, omitindo itens em USD quando não há taxa válida. `validarDisponibilidade(itens)` verifica a soma das quantidades por produto sem baixar estoque. Antes do uso real, Henrique deve fornecer persistência/API IPC com autorização, e Nycollas deve conectar a validação ao checkout. A confirmação deverá revalidar e baixar o estoque em uma transação MySQL atômica. Recibos e histórico devem usar o preço confirmado da venda, não recalcular com uma cotação posterior.
+```sh
+npm run lint
+npm test
+npm run build
+npm run preview
+```
 
-Para conferir visualmente só este módulo no navegador, execute `npm run prototype:produtos` e abra `http://127.0.0.1:5174`. A prévia usa o mesmo componente do Electron, sem simular APIs de clientes ou autenticação. O armazenamento de cada navegador/perfil é independente do Electron. A exclusão pede confirmação dentro da tela, com opções de cancelar e confirmar.
+O build verifica os tipos e gera o aplicativo em `out/`. Para gerar o executável portátil do Windows, execute `npm run dist:win`. O arquivo sai em `dist/`. Para usá-lo, coloque o `.env` configurado ao lado do executável. As credenciais ficam fora do pacote.
 
-Validação: `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`. Os testes de interface usam happy-dom; a validação HTML nativa é simulada nesses testes e também pode ser conferida na prévia real. Nenhuma migration ou seed é necessária para a demonstração de produtos.
+Com as migrações aplicadas a um banco de teste, execute `npm run test:integration`. O teste cria registros próprios e verifica rollback, duas compras simultâneas da última unidade e preservação do valor do recibo. [Teste de integração](tests/integration/README.md)
 
-Se o Electron compilar e encerrar antes de abrir uma janela em um terminal restrito de automação, tente `npm run dev` no PowerShell normal do Windows, a partir da pasta do projeto. Isso não exige alterar o MySQL ou desativar a segurança do Electron. Se a instalação informar `Electron uninstall`, confirme que o download do binário foi permitido pelo npm e execute o instalador oficial local com `node node_modules/electron/install.js` antes de tentar novamente.
+Os protótipos independentes continuam disponíveis aos desenvolvedores por `npm run prototype:produtos` e `npm run prototype:historico`. Eles usam dados de exemplo. O catálogo do desktop usa o MySQL compartilhado após o login. Os antigos exemplos salvos no navegador ou armazenamento local permanecem separados das vendas.
+
+Se o npm indicar que falta o binário do Electron, permita o download oficial e execute `node node_modules/electron/install.js`.
 
 ## Divisão da equipe
 
@@ -80,7 +99,7 @@ Se o Electron compilar e encerrar antes de abrir uma janela em um terminal restr
 - [x] **[Henrique]** Definir contratos TypeScript compartilhados (`ClienteResumo`, `ProdutoResumo`, `PedidoRascunho`) sem implementar telas de terceiros.
 - [x] **[Henrique]** Configurar credenciais MySQL locais e validar conexão com o servidor da escola.
 - [x] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
-- [ ] **[Nycollas]** Criar wireframe e tela estática do caixa/checkout com dados simulados.
+- [x] **[Nycollas]** Criar wireframe e tela estática do caixa/checkout com dados simulados. [Layout do caixa](docs/caixa.png)
 - [x] **[Enzo]** Criar [modelo visual de recibo e histórico](src/renderer/src/modules/historico/prototype/index.html) usando dados simulados.
 
 ### Fase 2 - Módulo do Henrique: backend, banco e clientes
@@ -136,32 +155,28 @@ As funcionalidades abaixo foram reorganizadas para seguir as camadas do projeto 
 
 Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge deles.
 
-### Próximos passos
+### Decisões de integração
 
-1. Atualizar a cópia local com `git switch develop` e `git pull --ff-only origin develop`.
-2. Iniciar a Fase 6. O checkout ainda usa mocks; a ligação com MySQL, IPC e a confirmação real de pedidos continuam pendentes.
-3. Executar o fluxo integrado completo antes de preparar a release.
+O catálogo, o dashboard e o caixa compartilham os produtos do MySQL. O processo principal controla a sessão, a cotação, a rota e a gravação da venda. A lista e o seletor de entregadores usam a resposta da mesma gravação. Um cadastro alterado por outra sessão precisa ser conferido antes de salvar novamente.
 
-> Nunca envie código diretamente para `develop`. A integração deve ocorrer pelo botão **Merge pull request** após revisão.
+### Fase 6 - Integração
 
-### Fase 6 - Integração planejada (somente quando os módulos isolados estiverem prontos)
-
-- [ ] **[Henrique]** Criar/adaptar repositórios MySQL para `Produto`, `Entregador`, `Pedido` e `ItemPedido` a partir dos contratos entregues.
-- [ ] **[Julia]** Substituir os dados de exemplo de produtos pela API IPC fornecida por Henrique.
+- [x] **[Henrique]** Criar/adaptar repositórios MySQL para `Produto`, `Entregador`, `Pedido` e `ItemPedido` a partir dos contratos entregues.
+- [x] **[Julia]** Substituir os dados de exemplo de produtos pela API IPC fornecida por Henrique.
 - [x] **[Nycollas]** Substituir os dados simulados de cliente, produto e entregador pelas APIs IPC; conectar o checkout ao pedido real.
 - [x] **[Enzo]** Conectar itens, recibo, histórico e e-mail ao pedido confirmado.
-- [ ] **[Julia]** Conectar a validação de estoque ao fechamento da venda.
+- [x] **[Julia]** Conectar a validação de estoque ao fechamento da venda.
 - [x] **[Nycollas]** Conectar o cálculo de frete/distância ao total final do pedido.
-- [ ] **[Henrique]** Validar transação de venda: gravar pedido, gravar itens e baixar estoque de forma atômica.
-- [ ] **[Todos]** Executar um fluxo integrado: login -> cliente -> produto -> checkout -> frete -> confirmação -> recibo/histórico.
+- [x] **[Henrique]** Validar transação de venda: gravar pedido, gravar itens e baixar estoque de forma atômica.
+- [x] **[Todos]** Executar um fluxo integrado: login -> cliente -> produto -> checkout -> frete -> confirmação -> recibo/histórico.
 
 ### Fase 7 - Entrega
 
-- [ ] **[Henrique]** Preparar banco com dados de demonstração e gerar build testável.
+- [x] **[Henrique]** Preparar banco com dados de demonstração e gerar build testável.
 - [x] **[Julia]** Revisar consistência visual e navegação.
-- [ ] **[Nycollas]** Revisar regras de pedido, frete e mensagens do checkout.
-- [ ] **[Enzo]** Atualizar documentação de instalação, uso e histórico de decisões.
-- [ ] **[Todos]** Revisar segurança, testes, checklist e Pull Requests.
+- [x] **[Nycollas]** Revisar regras de pedido, frete e mensagens do checkout.
+- [x] **[Enzo]** Atualizar documentação de instalação, uso e histórico de decisões.
+- [x] **[Todos]** Revisar segurança, testes, checklist e Pull Requests.
 - [ ] **[Henrique]** Criar a release final na branch `main`.
 
 ## Convenções Git
@@ -184,7 +199,7 @@ Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge del
 ### Pull Requests
 
 - Abrir PR da branch de tarefa para `develop`.
-- Utilizar o [modelo de Pull Request](.github/PULL_REQUEST_TEMPLATE.md).
+- Descrever no Pull Request as alterações e os testes executados.
 - Solicitar revisão de pelo menos uma pessoa antes do merge.
 - Não realizar merge sem a revisão necessária.
 - Após o merge, sincronizar a `develop` local com o GitHub.
@@ -278,9 +293,9 @@ feat(julia-produtos): cria regra de produto indisponivel
 feat(nycollas-checkout): calcula frete do pedido
 ```
 
-## Critério de pronto para qualquer checkbox
+## Critérios para as próximas tarefas
 
-- [ ] **[Responsável da tarefa]** Código em TypeScript, validado sem erros de compilação.
-- [ ] **[Responsável da tarefa]** Módulo testado com dados próprios ou mock, sem depender de outro módulo.
-- [ ] **[Responsável da tarefa]** Commit criado e checkbox marcado.
-- [ ] **[Revisor do PR]** Pull Request revisado antes do merge em `develop`.
+- **[Responsável da tarefa]** Código em TypeScript, validado sem erros de compilação.
+- **[Responsável da tarefa]** Módulo testado com dados próprios ou mock, sem depender de outro módulo.
+- **[Responsável da tarefa]** Commit criado e checkbox marcado.
+- **[Revisor do PR]** Pull Request revisado antes do merge em `develop`.

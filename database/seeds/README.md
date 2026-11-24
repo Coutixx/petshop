@@ -1,3 +1,3 @@
-O script `seed.mjs` é executado por `npm run db:seed` e precisa que `001-inicial.sql` já tenha sido aplicado. Defina `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD` no `.env`; a senha precisa ter pelo menos 12 caracteres e é armazenada como hash scrypt.
+Com as três migrações aplicadas, preencha `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD` no `.env`. Use uma senha de pelo menos 12 caracteres e execute `npm run db:seed`.
 
-O script cria o administrador apenas se o e-mail ainda não existir e insere clientes demonstrativos apenas se seus e-mails não existirem. Reexecutá-lo não duplica os registros nem redefine a senha existente. Não há credenciais padrão no repositório.
+O seed grava o administrador, dois clientes, três produtos e um entregador em uma transação. Identifica contas e clientes pelo e-mail, produtos pelo nome e o entregador pelo telefone. Repetir o comando preserva a senha, o estoque e a disponibilidade existentes.

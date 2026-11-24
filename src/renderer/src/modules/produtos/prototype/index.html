@@ -11,12 +11,11 @@
         <p class="text-uppercase text-secondary small fw-semibold mb-1">PetShop Cotil · Prévia local</p>
         <h1 class="h4 mb-0">Produtos e dashboard</h1>
       </header>
-      <section id="login-view" class="mx-auto">
-        <h2 class="h5">Demonstração independente</h2>
-        <p>Explore o mesmo catálogo usado no Electron, com dados locais deste navegador e sem conexão com o MySQL.</p>
-        <button id="demo-catalog" class="btn btn-primary" type="button">Explorar produtos e dashboard de demonstração</button>
-      </section>
-      <section id="clients-view" class="d-none" hidden aria-hidden="true"></section>
+      <nav class="mb-3" aria-label="Navegação da prévia">
+        <button class="btn btn-outline-primary" data-screen="dashboard">Visão geral</button>
+        <button class="btn btn-outline-primary" data-screen="produtos">Produtos</button>
+      </nav>
+      <div id="clients-view"></div>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>

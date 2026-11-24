@@ -15,14 +15,11 @@ import type {
 } from '../../shared/contracts'
 import { criarServicoEmail, tentarEnviarReciboVenda } from '../../shared/domain/recibos/email-service'
 
-import type { Entregador } from '../../models/Entregador'
 import type { ProdutoCheckout } from '../../models/Produto'
 
-import { produtosMock } from '../../mocks/produtosMock'
-import { entregadoresMock } from '../../mocks/entregadoresMock'
 import { CheckoutService } from '../../services/CheckoutService'
 
-const catalogo = iniciarCatalogo({ permitirDemonstracao: false })
+const catalogo = iniciarCatalogo(window.petShop)
 
 const version = requiredElement<HTMLElement>('#app-version')
 const testDatabaseButton = requiredElement<HTMLButtonElement>('#test-db')
@@ -47,12 +44,20 @@ let usuarioAtual: UsuarioAutenticado | null = null
 let clienteEmEdicao: number | null = null
 const checkout = new CheckoutService()
 let clientesCheckout: Cliente[] = []
-let produtosCheckout: ProdutoCheckout[] = [...produtosMock]
-let entregadoresCheckout: Entregador[] = [...entregadoresMock]
+let produtosCheckout: ProdutoCheckout[] = []
+let entregadoresCheckout: EntregadorResumo[] = []
 let distanciaCalculada: number | null = null
 let duracaoCalculada: number | null = null
-let produtosIntegrados = false
-let entregadoresIntegrados = false
+let revisaoEntregadores = 0
+let revisaoProdutos = 0
+let revisaoRota = 0
+let entregadorEmEdicao: EntregadorResumo | null = null
+let salvandoEntregador = false
+let confirmandoPedido = false
+let telaAtual = 'dashboard'
+const delivererForm = requiredElement<HTMLFormElement>('#deliverer-form')
+const delivererSubmit = requiredElement<HTMLButtonElement>('#deliverer-form button[type=submit]')
+const delivererStatus = requiredElement<HTMLElement>('#deliverers-source')
 const emailService = criarServicoEmail()
 
 window.petShop.getAppVersion()
@@ -92,8 +97,6 @@ loginForm.addEventListener('submit', async (event) => {
       String(formData.get('senha') ?? '')
     )
     renderSession()
-    await carregarClientes()
-    await carregarCheckoutData()
     setStatus('', 'secondary')
     loginForm.reset()
   } catch (error) {
@@ -106,61 +109,100 @@ loginForm.addEventListener('submit', async (event) => {
 logoutButton.addEventListener('click', async () => {
   await window.petShop.logout()
   usuarioAtual = null
-  clientsList.replaceChildren()
-  checkout.limparCarrinho()
-  distanciaCalculada = null
-  duracaoCalculada = null
-  renderCarrinho()
-  requiredElement<HTMLElement>('#order-preview').textContent = ''
-  requiredElement<HTMLElement>('#cart-items').replaceChildren()
-  fecharFormulario()
+  catalogo.encerrar()
   renderSession()
-  setStatus('Sessão encerrada.', 'secondary')
+  window.location.reload()
 })
 
 requiredElement<HTMLButtonElement>('#new-client').addEventListener('click', () => abrirFormulario())
 requiredElement<HTMLButtonElement>('#cancel-client').addEventListener('click', fecharFormulario)
 
-function showClients(): void {
-  clientsView.classList.remove('d-none')
-  checkoutView.classList.add('d-none')
-  historyView.classList.add('d-none')
+function mostrarTela(tela: string): void {
+  if (!usuarioAtual) return
+  telaAtual = tela
+  setStatus('', 'secondary')
+  clientsView.classList.toggle('d-none', tela !== 'clientes')
+  checkoutView.classList.toggle('d-none', tela !== 'checkout')
+  historyView.classList.toggle('d-none', tela !== 'historico')
+  catalogo.mostrar(tela, usuarioAtual.nivel === 'admin')
+  for (const button of appNav.querySelectorAll<HTMLButtonElement>('[data-screen]')) {
+    if (button.dataset.screen === tela) button.setAttribute('aria-current', 'page')
+    else button.removeAttribute('aria-current')
+  }
+  if (tela === 'checkout') {
+    void carregarClientes()
+    void carregarCheckoutData()
+  }
+  if (tela === 'clientes') void carregarClientes()
+  if (tela === 'historico') void carregarHistorico()
 }
-function showCheckout(): void {
-  clientsView.classList.add('d-none')
-  checkoutView.classList.remove('d-none')
-  historyView.classList.add('d-none')
+for (const button of appNav.querySelectorAll<HTMLButtonElement>('[data-screen]')) {
+  button.addEventListener('click', () => mostrarTela(button.dataset.screen!))
 }
-function showHistory(): void {
-  clientsView.classList.add('d-none')
-  checkoutView.classList.add('d-none')
-  historyView.classList.remove('d-none')
-  void carregarHistorico()
-}
-requiredElement<HTMLButtonElement>('#show-clients').addEventListener('click', showClients)
-requiredElement<HTMLButtonElement>('#nav-checkout').addEventListener('click', showCheckout)
-requiredElement<HTMLButtonElement>('#nav-clients').addEventListener('click', showClients)
-requiredElement<HTMLButtonElement>('#nav-history').addEventListener('click', showHistory)
 requiredElement<HTMLButtonElement>('#refresh-history').addEventListener('click', () => void carregarHistorico())
 
-requiredElement<HTMLFormElement>('#deliverer-form').addEventListener('submit', async (event) => {
+delivererForm.addEventListener('submit', async (event) => {
   event.preventDefault()
+  if (salvandoEntregador) return
   const name = requiredElement<HTMLInputElement>('#deliverer-name')
   const phone = requiredElement<HTMLInputElement>('#deliverer-phone')
   const vehicle = requiredElement<HTMLInputElement>('#deliverer-vehicle')
-  const input: EntregadorInput = { nome: name.value.trim(), telefone: phone.value.trim(), veiculo: vehicle.value.trim(), disponivel: true }
-  try {
-    const created = entregadoresIntegrados
-      ? await window.petShop.criarEntregador(input)
-      : { ...input, id: Math.max(0, ...entregadoresCheckout.map(item => item.id)) + 1 }
-    entregadoresCheckout.push(created)
-    ;(event.currentTarget as HTMLFormElement).reset()
-    renderEntregadores()
-    setStatus('Entregador cadastrado.', 'success')
-  } catch (error) { setStatus(errorMessage(error, 'Não foi possível cadastrar o entregador.'), 'danger') }
+  const anterior = entregadorEmEdicao
+  const input: EntregadorInput = {
+    nome: name.value.trim(), telefone: phone.value.trim(), veiculo: vehicle.value.trim(),
+    disponivel: anterior?.disponivel ?? true
+  }
+  await alterarEntregador(async () => {
+    if (anterior) {
+      const atualizado = await window.petShop.atualizarEntregador(anterior.id, input, anterior)
+      entregadoresCheckout = entregadoresCheckout.map(item => item.id === anterior.id ? atualizado : item)
+    } else {
+      entregadoresCheckout.push(await window.petShop.criarEntregador(input))
+    }
+    editarEntregador(null)
+  }, anterior ? 'Cadastro atualizado.' : 'Entregador cadastrado.')
 })
 
+function editarEntregador(entregador: EntregadorResumo | null): void {
+  entregadorEmEdicao = entregador
+  delivererForm.reset()
+  delivererSubmit.textContent = entregador ? 'Salvar' : 'Adicionar'
+  requiredElement('#cancel-deliverer').classList.toggle('d-none', !entregador)
+  if (entregador) {
+    requiredElement<HTMLInputElement>('#deliverer-name').value = entregador.nome
+    requiredElement<HTMLInputElement>('#deliverer-phone').value = entregador.telefone
+    requiredElement<HTMLInputElement>('#deliverer-vehicle').value = entregador.veiculo
+    requiredElement('#deliverer-name').focus()
+  }
+}
+requiredElement('#cancel-deliverer').addEventListener('click', () => editarEntregador(null))
+
+async function alterarEntregador(alterar: () => Promise<void>, mensagem: string): Promise<void> {
+  if (salvandoEntregador || !usuarioAtual) return
+  salvandoEntregador = true
+  revisaoEntregadores++
+  delivererSubmit.disabled = true
+  delivererStatus.textContent = 'Salvando…'
+  renderEntregadores()
+  let falha = ''
+  try {
+    await alterar()
+    delivererStatus.textContent = mensagem
+  } catch (error) {
+    falha = errorMessage(error, 'Não foi possível salvar o entregador.')
+  } finally {
+    salvandoEntregador = false
+    delivererSubmit.disabled = false
+    renderEntregadores()
+  }
+  if (falha) {
+    await carregarEntregadores()
+    delivererStatus.textContent = falha
+  }
+}
+
 requiredElement<HTMLSelectElement>('#checkout-customer').addEventListener('change', () => {
+  revisaoRota++
   distanciaCalculada = null
   duracaoCalculada = null
   renderCarrinho()
@@ -176,10 +218,14 @@ requiredElement<HTMLButtonElement>('#calculate-delivery').addEventListener('clic
     button.disabled = false
     return
   }
-  const enderecoDestino = `${cliente.logradouro}, ${cliente.numero}, ${cliente.bairro}, ${cliente.cidade} - ${cliente.uf}, ${cliente.cep}, Brasil`
+  const revisao = ++revisaoRota
+  distanciaCalculada = null
+  duracaoCalculada = null
+  renderCarrinho()
   setStatus('Consultando a rota para o endereço do cliente...', 'secondary')
   try {
-    const rota = await window.petShop.calcularDistancia(enderecoDestino)
+    const rota = await window.petShop.calcularDistancia(clienteId)
+    if (revisao !== revisaoRota) return
     distanciaCalculada = rota.distanciaKm
     duracaoCalculada = rota.duracaoMinutos
     const valores = checkout.calcularTotal(distanciaCalculada)
@@ -189,6 +235,7 @@ requiredElement<HTMLButtonElement>('#calculate-delivery').addEventListener('clic
     requiredElement<HTMLButtonElement>('#create-order').disabled = checkout.listarItens().length === 0
     setStatus('Distância e frete calculados.', 'success')
   } catch (error) {
+    if (revisao !== revisaoRota) return
     distanciaCalculada = null
     duracaoCalculada = null
     requiredElement<HTMLElement>('#checkout-shipping').textContent = 'Indisponível'
@@ -203,18 +250,26 @@ requiredElement<HTMLButtonElement>('#calculate-delivery').addEventListener('clic
 requiredElement<HTMLButtonElement>('#create-order').addEventListener('click', async () => {
   const clienteId = Number(requiredElement<HTMLSelectElement>('#checkout-customer').value)
   const entregadorValue = requiredElement<HTMLSelectElement>('#checkout-deliverer').value
-  if (!distanciaCalculada) return setStatus('Calcule a distância antes de criar o pedido.', 'danger')
-  const button = requiredElement<HTMLButtonElement>('#create-order')
-  button.disabled = true
+  if (confirmandoPedido) return
+  if (distanciaCalculada === null) return setStatus('Calcule a distância antes de criar o pedido.', 'danger')
+  confirmandoPedido = true
+  checkoutView.inert = true
+  renderCarrinho()
   try {
     const input: CriarPedidoInput = {
       clienteId,
       entregadorId: entregadorValue ? Number(entregadorValue) : null,
-      itens: checkout.listarItens().map(({ produtoId, quantidade }) => ({ produtoId, quantidade })),
+      itens: checkout.listarItens().map(({ produtoId, quantidade, precoUnitario }) => ({ produtoId, quantidade, precoEsperado: precoUnitario })),
       distanciaKm: distanciaCalculada,
       duracaoMinutos: duracaoCalculada ?? 0
     }
     const pedido = await window.petShop.criarPedido(input)
+    if (pedido.entregadorId !== null) {
+      revisaoEntregadores++
+      const entregador = entregadoresCheckout.find(item => item.id === pedido.entregadorId)
+      if (entregador) entregador.disponivel = false
+      renderEntregadores()
+    }
     const previsto = new Date(pedido.previsaoEntrega!).toLocaleString('pt-BR')
     requiredElement<HTMLElement>('#checkout-subtotal').textContent = formatCurrency(pedido.subtotal)
     requiredElement<HTMLElement>('#checkout-shipping').textContent = formatCurrency(pedido.frete)
@@ -236,12 +291,17 @@ requiredElement<HTMLButtonElement>('#create-order').addEventListener('click', as
     distanciaCalculada = null
     duracaoCalculada = null
     renderCarrinho()
-    await carregarCheckoutData()
-    setStatus('Pedido registrado e estoque atualizado.', 'success')
+    void carregarCheckoutData()
+    setStatus('Pedido confirmado e estoque atualizado.', 'success')
   } catch (error) {
-    setStatus(errorMessage(error, 'Não foi possível criar o rascunho.'), 'danger')
+    distanciaCalculada = null
+    duracaoCalculada = null
+    setStatus(errorMessage(error, 'Não foi possível confirmar o pedido.'), 'danger')
+    void carregarCheckoutData()
   } finally {
-    button.disabled = false
+    confirmandoPedido = false
+    checkoutView.inert = false
+    renderCarrinho()
   }
 })
 
@@ -402,16 +462,11 @@ function fecharFormulario(): void {
 function renderSession(): void {
   const autenticado = usuarioAtual !== null
   loginView.classList.toggle('d-none', autenticado)
-  if (!autenticado) {
-    clientsView.classList.add('d-none')
-    checkoutView.classList.add('d-none')
-    historyView.classList.add('d-none')
-  } else if (
-    clientsView.classList.contains('d-none') &&
-    checkoutView.classList.contains('d-none') &&
-    historyView.classList.contains('d-none')
-  ) {
-    showCheckout()
+  document.body.classList.toggle('signed-out', !autenticado)
+  if (autenticado) mostrarTela('dashboard')
+  else {
+    for (const view of [clientsView, checkoutView, historyView]) view.classList.add('d-none')
+    catalogo.mostrar('', false)
   }
   appNav.classList.toggle('d-none', !autenticado)
   appNav.classList.toggle('d-flex', autenticado)
@@ -420,49 +475,57 @@ function renderSession(): void {
   sessionUser.textContent = usuarioAtual
     ? `${usuarioAtual.nome} · ${usuarioAtual.nivel === 'admin' ? 'Administrador' : 'Atendente'}`
     : ''
-  catalogo.atualizarSessao(autenticado)
 }
 
-async function carregarCheckoutData(): Promise<void> {
-  // Clientes vêm do IPC real. Produtos e entregadores usam fixtures até existirem handlers IPC.
-  produtosIntegrados = false
-  entregadoresIntegrados = false
+async function carregarProdutos(): Promise<void> {
+  const revisao = ++revisaoProdutos
+  const status = requiredElement<HTMLElement>('#products-source')
   try {
-    if (window.petShop.listarProdutos) {
-      const produtos = await window.petShop.listarProdutos()
-      produtosCheckout = produtos.map((produto: ProdutoResumo) => ({ ...produto, categoria: produto.categoria ?? 'Catálogo' }))
-      produtosIntegrados = true
-    }
+    const produtos = await window.petShop.listarProdutos()
+    if (revisao !== revisaoProdutos) return
+    produtosCheckout = produtos.map((produto: ProdutoResumo) => ({ ...produto, categoria: produto.categoria ?? 'Catálogo' }))
+    status.textContent = produtos.some(produto => produto.disponivel) ? '' : 'Nenhum produto disponível para venda.'
+    renderProdutos()
   } catch (error) {
-    produtosCheckout = missingIpcHandler(error) ? [...produtosMock] : []
-    if (!missingIpcHandler(error)) setStatus(errorMessage(error, 'Falha ao carregar produtos.'), 'danger')
+    if (revisao !== revisaoProdutos) return
+    produtosCheckout = []
+    renderProdutos()
+    status.textContent = errorMessage(error, 'Falha ao carregar produtos.')
   }
-  try {
-    if (window.petShop.listarEntregadores) {
-      const entregadores = await window.petShop.listarEntregadores()
-      entregadoresCheckout = entregadores.map((item: EntregadorResumo) => ({ ...item }))
-      entregadoresIntegrados = true
-    }
-  } catch (error) {
-    entregadoresCheckout = missingIpcHandler(error) ? [...entregadoresMock] : []
-    if (!missingIpcHandler(error)) setStatus(errorMessage(error, 'Falha ao carregar entregadores.'), 'danger')
-  }
-  requiredElement<HTMLElement>('#products-source').textContent = produtosIntegrados
-    ? 'Produtos carregados pelo IPC do backend.'
-    : 'Catálogo local de teste até a API IPC de produtos estar disponível.'
-  requiredElement<HTMLElement>('#deliverers-source').textContent = entregadoresIntegrados
-    ? 'Entregadores carregados pelo IPC do backend.'
-    : 'dados locais de teste'
-  renderProdutos()
-  renderClientesCheckout()
-  renderEntregadores()
 }
+
+async function carregarEntregadores(): Promise<void> {
+  if (salvandoEntregador) return
+  const revisao = ++revisaoEntregadores
+  delivererSubmit.disabled = true
+  delivererStatus.textContent = 'Carregando…'
+  try {
+    const lista = await window.petShop.listarEntregadores()
+    if (revisao !== revisaoEntregadores) return
+    entregadoresCheckout = lista
+    renderEntregadores()
+    delivererStatus.textContent = lista.length ? '' : 'Nenhum entregador cadastrado.'
+  } catch (error) {
+    if (revisao !== revisaoEntregadores) return
+    delivererStatus.textContent = errorMessage(error, 'Falha ao carregar entregadores.')
+  } finally {
+    if (revisao === revisaoEntregadores) delivererSubmit.disabled = false
+  }
+}
+
+function carregarCheckoutData(): Promise<unknown> {
+  return Promise.all([carregarProdutos(), carregarEntregadores()])
+}
+window.addEventListener('focus', () => {
+  if (usuarioAtual && telaAtual === 'checkout') void carregarEntregadores()
+})
 
 async function carregarHistorico(): Promise<void> {
   const container = requiredElement<HTMLElement>('#history-list')
   const empty = requiredElement<HTMLElement>('#history-empty')
   try {
     const pedidos = await window.petShop.listarPedidos()
+    empty.textContent = 'Nenhum pedido confirmado.'
     container.replaceChildren()
     empty.classList.toggle('d-none', pedidos.length > 0)
     for (const pedido of pedidos) container.append(renderPedidoHistorico(pedido))
@@ -538,7 +601,8 @@ function renderPedidoHistorico(pedido: PedidoRegistrado): HTMLElement {
   printButton.textContent = 'Imprimir recibo'
   printButton.addEventListener('click', () => {
     details.open = true
-    window.print()
+    details.classList.add('imprimir')
+    try { window.print() } finally { details.classList.remove('imprimir') }
   })
   const sendButton = document.createElement('button')
   sendButton.type = 'button'
@@ -603,8 +667,12 @@ function renderProdutos(): void {
     add.className = 'btn btn-outline-primary btn-sm'
     add.textContent = 'Adicionar'
     add.addEventListener('click', () => {
-      checkout.adicionarProduto(produto.id, produto.nome, produto.preco, 1)
-      distanciaCalculada = null
+      try {
+        checkout.adicionarProduto(produto.id, produto.nome, produto.preco, 1)
+      } catch (error) {
+        setStatus(errorMessage(error, 'Não foi possível adicionar o produto.'), 'danger')
+        return
+      }
       requiredElement<HTMLElement>('#order-preview').textContent = ''
       renderCarrinho()
     })
@@ -634,7 +702,6 @@ function renderCarrinho(): void {
     quantity.setAttribute('aria-label', `Quantidade ${item.quantidade}`)
     const increment = quantityButton('+', () => {
       checkout.adicionarProduto(item.produtoId, item.nome, item.precoUnitario, 1)
-      distanciaCalculada = null
       renderCarrinho()
     })
     controls.append(decrement, quantity, increment)
@@ -644,8 +711,11 @@ function renderCarrinho(): void {
   const subtotal = checkout.calcularSubtotal()
   requiredElement<HTMLElement>('#checkout-subtotal').textContent = formatCurrency(subtotal)
   requiredElement<HTMLElement>('#checkout-total').textContent = formatCurrency(distanciaCalculada === null ? subtotal : checkout.calcularTotal(distanciaCalculada).total)
-  if (distanciaCalculada === null) requiredElement<HTMLElement>('#checkout-shipping').textContent = 'A calcular'
-  requiredElement<HTMLButtonElement>('#create-order').disabled = distanciaCalculada === null || itens.length === 0
+  if (distanciaCalculada === null) {
+    requiredElement<HTMLElement>('#checkout-shipping').textContent = 'A calcular'
+    requiredElement<HTMLElement>('#distance-note').textContent = ''
+  }
+  requiredElement<HTMLButtonElement>('#create-order').disabled = confirmandoPedido || distanciaCalculada === null || itens.length === 0
 }
 
 function quantityButton(label: string, action: () => void): HTMLButtonElement {
@@ -658,11 +728,18 @@ function quantityButton(label: string, action: () => void): HTMLButtonElement {
   return button
 }
 
+function opcao(rotulo: string, valor: string): HTMLOptionElement {
+  const elemento = document.createElement('option')
+  elemento.textContent = rotulo
+  elemento.value = valor
+  return elemento
+}
+
 function renderClientesCheckout(): void {
   const select = requiredElement<HTMLSelectElement>('#checkout-customer')
   const selected = select.value
-  select.replaceChildren(new Option('Selecione um cliente', ''))
-  for (const cliente of clientesCheckout) select.add(new Option(cliente.nome, String(cliente.id)))
+  select.replaceChildren(opcao('Selecione um cliente', ''))
+  for (const cliente of clientesCheckout) select.add(opcao(cliente.nome, String(cliente.id)))
   if (clientesCheckout.some(cliente => String(cliente.id) === selected)) select.value = selected
 }
 
@@ -671,9 +748,9 @@ function renderEntregadores(): void {
   const select = requiredElement<HTMLSelectElement>('#checkout-deliverer')
   const selected = select.value
   list.replaceChildren()
-  select.replaceChildren(new Option('Sem entregador', ''))
-  for (const entregador of entregadoresCheckout) {
-    const option = new Option(`${entregador.nome} (${entregador.veiculo})`, String(entregador.id))
+  select.replaceChildren(opcao('Sem entregador', ''))
+  for (const entregador of [...entregadoresCheckout].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id - b.id)) {
+    const option = opcao(`${entregador.nome} (${entregador.veiculo})`, String(entregador.id))
     option.disabled = !entregador.disponivel
     select.add(option)
     const row = document.createElement('div')
@@ -685,38 +762,29 @@ function renderEntregadores(): void {
     toggle.type = 'button'
     toggle.className = `btn btn-sm ${entregador.disponivel ? 'btn-outline-success' : 'btn-outline-secondary'}`
     toggle.textContent = entregador.disponivel ? 'Disponível' : 'Indisponível'
-    toggle.addEventListener('click', async () => {
-      toggle.disabled = true
-      try {
-        const input: EntregadorInput = { ...entregador, disponivel: !entregador.disponivel }
-        const updated = entregadoresIntegrados
-          ? await window.petShop.atualizarEntregador(entregador.id, input)
-          : input
-        Object.assign(entregador, updated)
-        renderEntregadores()
-      } catch (error) {
-        toggle.disabled = false
-        setStatus(errorMessage(error, 'Não foi possível atualizar a disponibilidade.'), 'danger')
-      }
-    })
-    row.append(label, toggle)
+    toggle.disabled = salvandoEntregador
+    toggle.addEventListener('click', () => void alterarEntregador(async () => {
+      const updated = await window.petShop.atualizarEntregador(entregador.id, { ...entregador, disponivel: !entregador.disponivel }, entregador)
+      entregadoresCheckout = entregadoresCheckout.map(item => item.id === updated.id ? updated : item)
+    }, 'Disponibilidade atualizada.'))
+    const editar = document.createElement('button')
+    editar.type = 'button'
+    editar.className = 'btn btn-sm btn-outline-secondary'
+    editar.textContent = 'Editar'
+    editar.disabled = salvandoEntregador
+    editar.addEventListener('click', () => editarEntregador(entregador))
+    row.append(label, toggle, editar)
     if (usuarioAtual?.nivel === 'admin') {
       const remove = document.createElement('button')
       remove.type = 'button'
       remove.className = 'btn btn-outline-danger btn-sm'
       remove.textContent = 'Remover'
-      remove.addEventListener('click', async () => {
-        remove.disabled = true
-        try {
-          if (entregadoresIntegrados) await window.petShop.excluirEntregador(entregador.id)
-          entregadoresCheckout = entregadoresCheckout.filter(item => item.id !== entregador.id)
-          renderEntregadores()
-          setStatus('Entregador removido.', 'success')
-        } catch (error) {
-          remove.disabled = false
-          setStatus(errorMessage(error, 'Não foi possível remover o entregador.'), 'danger')
-        }
-      })
+      remove.disabled = salvandoEntregador
+      remove.addEventListener('click', () => void alterarEntregador(async () => {
+        await window.petShop.excluirEntregador(entregador.id)
+        if (entregadorEmEdicao?.id === entregador.id) editarEntregador(null)
+        entregadoresCheckout = entregadoresCheckout.filter(item => item.id !== entregador.id)
+      }, 'Entregador removido.'))
       row.append(remove)
     }
     list.append(row)
@@ -734,11 +802,8 @@ function setStatus(message: string, tone: 'secondary' | 'success' | 'danger'): v
 }
 
 function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
-
-function missingIpcHandler(error: unknown): boolean {
-  return error instanceof Error && error.message.toLowerCase().includes('no handler registered')
+  if (!(error instanceof Error) || !error.message) return fallback
+  return error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '')
 }
 
 function stringValue(data: FormData, key: string): string {
@@ -758,10 +823,7 @@ function requiredElement<T extends HTMLElement>(selector: string): T {
 window.petShop.getUsuarioAtual().then((usuario) => {
   usuarioAtual = usuario
   renderSession()
-  if (usuarioAtual) {
-    void carregarClientes()
-    void carregarCheckoutData()
-  }
+
 }).catch(() => {
   setStatus('Não foi possível restaurar a sessão.', 'danger')
 })

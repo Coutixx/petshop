@@ -4,7 +4,7 @@ import { EntregadorRepository } from './entregador-repository'
 export interface EntregadorRepositoryPort {
   listar(): Promise<EntregadorResumo[]>
   criar(input: EntregadorInput): Promise<EntregadorResumo>
-  atualizar(id: number, input: EntregadorInput): Promise<EntregadorResumo | null>
+  atualizar(id: number, input: EntregadorInput, anterior?: EntregadorInput): Promise<EntregadorResumo | null>
   excluir(id: number): Promise<boolean>
 }
 
@@ -25,9 +25,10 @@ export class EntregadorPersistenceService {
     return this.repository.criar(validar(input))
   }
 
-  async atualizar(id: number, input: EntregadorInput): Promise<EntregadorResumo> {
+  async atualizar(id: number, input: EntregadorInput, anterior?: EntregadorInput): Promise<EntregadorResumo> {
     validarId(id)
-    const entregador = await this.repository.atualizar(id, validar(input))
+    const entregador = await this.repository.atualizar(id, validar(input), anterior && validar(anterior))
+    if (!entregador && anterior) throw new EntregadorEntradaInvalidaError('O cadastro mudou. Confira a lista atualizada e tente novamente.')
     if (!entregador) throw new EntregadorNaoEncontradoError()
     return entregador
   }

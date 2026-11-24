@@ -14,6 +14,6 @@ export function exigirLogin(usuario: UsuarioAutenticado | null): asserts usuario
 export function exigirAdmin(usuario: UsuarioAutenticado | null): void {
   exigirLogin(usuario)
   if (usuario.nivel !== 'admin') {
-    throw new NaoAutorizadoError('Somente administradores podem excluir clientes.')
+    throw new NaoAutorizadoError('Somente administradores podem excluir cadastros.')
   }
 }
