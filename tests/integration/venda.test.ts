@@ -27,9 +27,18 @@ it('confirma apenas uma venda da última unidade e preserva o recibo após mudan
   clienteId = cliente.id
   const entregador = await entregadores.criar({ nome: identificador, telefone: '19999990001', veiculo: 'Moto', disponivel: true })
   entregadorId = entregador.id
+  expect((await entregadores.listar()).find(item => item.id === entregadorId)).toMatchObject(entregador)
+  const atualizado = await entregadores.atualizar(entregadorId, { ...entregador, veiculo: 'Carro', disponivel: false }, entregador)
+  expect((await entregadores.listar()).find(item => item.id === entregadorId)).toMatchObject({ veiculo: 'Carro', disponivel: false })
+  await entregadores.atualizar(entregadorId, entregador, atualizado)
+  await clientes.atualizar(clienteId, { ...cliente, complemento: 'Teste de atualização' })
+  expect((await clientes.buscarPorId(clienteId))?.complemento).toBe('Teste de atualização')
   await produtos.criar({ nome: identificador, categoria: 'Higiene', moeda: 'USD', preco: 4, importado: true, estoque: 1 })
   const produto = (await produtos.listar()).find(item => item.nome === identificador)!
   produtoId = produto.id
+  await produtos.atualizar(produtoId, { ...produto, preco: 5 }, 1)
+  expect((await produtos.listar()).find(item => item.id === produtoId)?.preco).toBe(5)
+  await produtos.atualizar(produtoId, produto, 1)
   expect((await produtos.listarDisponiveis(null)).some(p => p.id === produto.id)).toBe(false)
   const input = { clienteId, entregadorId: null, itens: [{ produtoId, quantidade: 1, precoEsperado: 20 }], distanciaKm: 2, duracaoMinutos: 10 }
   await expect(pedidos.criar({ ...input, entregadorId, itens: [{ produtoId, quantidade: 2 }] })).rejects.toThrow('Estoque insuficiente')
@@ -52,6 +61,9 @@ it('confirma apenas uma venda da última unidade e preserva o recibo após mudan
   const vendas = (await pedidos.listar()).filter(p => p.clienteId === clienteId)
   expect(vendas).toHaveLength(1)
   expect(vendas[0]).toMatchObject({ frete: 5, total: 25, itens: [{ produtoId, quantidade: 1, precoUnitario: 20 }] })
+  expect((await produtos.listar()).some(item => item.id === produtoId)).toBe(false)
+  await entregadores.excluir(entregadorId)
+  expect((await entregadores.listar()).some(item => item.id === entregadorId)).toBe(false)
 })
 
 afterAll(async () => {
