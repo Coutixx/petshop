@@ -4,143 +4,298 @@ Aplicativo desktop para gerenciamento de um PetShop, desenvolvido para a discipl
 
 ## Tecnologias e arquitetura
 
-Electron, TypeScript, PostgreSQL em Docker e Bootstrap. A aplicação seguirá este fluxo:
+Electron, TypeScript, MySQL da escola e Bootstrap. A aplicação segue este fluxo:
 
 ```text
-Interface (renderer) -> preload tipado -> IPC (main) -> service/repository -> PostgreSQL
+Interface (renderer) -> preload tipado -> IPC (main) -> service/repository -> MySQL
 ```
 
-O PostgreSQL será executado localmente via Docker Compose durante o desenvolvimento. Cada módulo deve funcionar isoladamente com seus próprios dados de exemplo. Nenhuma pessoa deve aguardar o módulo de outra para começar: a ligação entre módulos ocorrerá somente na fase de integração.
+O banco MySQL é mantido pelo servidor da escola, então não depende do Docker nem de um notebook ligado. Cada integrante deve usar suas próprias credenciais em um `.env` local; não compartilhe credenciais pessoais. Para um banco compartilhado pela equipe, solicite ao professor uma conta de projeto com permissões limitadas.
 
-## Estrutura inicial
+## Arquitetura
 
-```text
-database/
-	migrations/
-	seeds/
-src/
-	main/
-		database/
-		ipc/
-		modules/
-			usuarios/
-			clientes/
-			viacep/
-	preload/
-	renderer/
-		src/
-	shared/
-		contracts/
-tests/
-	integration/
-	unit/
+O código é separado por responsabilidades, organizando a aplicação em camadas:
+
+| **Camada** | **Responsabilidade** |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `Renderer` | Interface gráfica, telas, componentes e interação com o usuário |
+| `Preload` | Comunicação segura entre o Renderer e o processo principal, expondo APIs tipadas |
+| `Main` | Inicialização do Electron, gerenciamento de janelas e registro dos handlers IPC |
+| `Services` | Regras de negócio e execução dos casos de uso da aplicação |
+| `Repositories` | Acesso ao banco de dados MySQL e execução das operações de persistência |
+| `Database` | Configuração da conexão e estrutura de acesso ao banco de dados |
+
+A comunicação entre as camadas ocorre por meio de IPC (Inter-Process Communication). O Renderer solicita operações através das APIs disponibilizadas pelo Preload, que encaminha as chamadas ao processo principal do Electron.
+
+No processo principal, os handlers IPC acionam os Services, que executam as regras de negócio e utilizam os Repositories para acessar o banco de dados MySQL. Dessa forma, a interface não acessa diretamente o banco de dados, mantendo as responsabilidades separadas.
+
+## Configuração local
+
+Use Node.js 24 LTS, npm e um banco MySQL com suporte a InnoDB. O servidor da escola pode exigir a rede do laboratório ou VPN. Para desenvolvimento, também é possível apontar o aplicativo para um banco de teste.
+
+```powershell
+Copy-Item .env.example .env # apenas na primeira configuração
+npm ci
 ```
 
-O processo `main` concentra acesso ao banco, regras de negócio e handlers IPC. O `preload` expõe somente operações tipadas ao `renderer`; credenciais ficam em variáveis de ambiente e não devem ser incluídas no Git.
+1. Preencha `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e `DB_PASSWORD` no `.env`. Configure `STORE_ADDRESS` com rua, número, cidade, UF e país da loja. O caixa usa esse endereço para calcular o frete.
+2. Aplique, em ordem, as migrações que faltarem, usando um cliente MySQL. A primeira cria as seis tabelas, a segunda adiciona veículo e disponibilidade ao entregador, e a terceira habilita o catálogo em BRL e USD. Em uma instalação existente, confira quais já foram aplicadas. [Migrações e diagrama](database/migrations/README.md)
+3. Defina `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD` (mínimo de 12 caracteres). Execute `npm run db:seed` para criar o administrador, dois clientes, três produtos e um entregador de demonstração. Repetir o seed preserva a senha e os estoques já cadastrados.
+4. Inicie com `npm run dev`. Entre com a conta do seed. O diagnóstico **Testar conexão MySQL** fica no rodapé da área autenticada.
+
+O `.env` é local. Cada integrante usa suas credenciais ou a conta do projeto fornecida pela escola.
+
+## Operação da loja
+
+- **Visão geral** mostra quantidade de produtos, unidades, valor do estoque e itens a repor. De uma a cinco unidades indicam estoque baixo. A venda exige estoque positivo.
+- **Produtos e estoque** permite cadastrar, editar, pesquisar e filtrar produtos. O preço original fica em BRL ou USD. **Atualizar cotação** busca a taxa de venda USD/BRL da AwesomeAPI. A interface informa a data e qualquer uso da última taxa da sessão. Sem cotação, os produtos em dólar aguardam conversão e o valor do estoque aparece como parcial.
+- **Clientes** reúne o cadastro e a busca de endereço por CEP. Atendentes podem consultar, cadastrar e editar. A exclusão de clientes, produtos e entregadores exige uma conta de administrador.
+- **Caixa** reúne produtos e entregadores à esquerda e o carrinho à direita. Adicione itens, escolha o cliente e, se necessário, um entregador disponível. **Calcular distância e frete** consulta o endereço do cliente via Nominatim e calcula a rota com OSRM. O frete custa R$ 5 até 3 km, R$ 10 até 8 km, R$ 15 até 15 km e mais R$ 1 por quilômetro excedente. Em caso de falha de rota, confira o endereço e repita o cálculo.
+- **Confirmar venda** revalida preço, estoque, endereço e disponibilidade do entregador. A mesma transação grava pedido e itens, baixa o estoque e reserva o entregador. Quando ele voltar, clique em **Indisponível** na lista para liberá-lo.
+- **Histórico** permite abrir e imprimir o recibo de cada venda. O preço unitário é o registrado no fechamento. O envio de e-mail é simulado para a disciplina. Uma falha no envio mantém a venda confirmada.
+
+### Wireframe do caixa
+
+| Produtos e entrega | Carrinho |
+| --- | --- |
+| Produtos disponíveis e botão Adicionar | Seleção de cliente e entregador |
+| Cadastro e edição do entregador | Itens, quantidades e subtotal |
+| Lista e disponibilidade dos entregadores | Frete, total e confirmação da venda |
+
+[Tela do caixa com cliente, estoque e entregador de demonstração](docs/caixa.png)
+
+## Build e validação
+
+```sh
+npm run lint
+npm test
+npm run build
+npm run preview
+```
+
+O build verifica os tipos e gera o aplicativo em `out/`. Para gerar o executável portátil do Windows, execute `npm run dist:win`. O arquivo sai em `dist/`. Para usá-lo, coloque o `.env` configurado ao lado do executável. As credenciais ficam fora do pacote.
+
+Com as migrações aplicadas a um banco de teste, execute `npm run test:integration`. O teste cria registros próprios e verifica rollback, duas compras simultâneas da última unidade e preservação do valor do recibo. [Teste de integração](tests/integration/README.md)
+
+Os protótipos independentes continuam disponíveis aos desenvolvedores por `npm run prototype:produtos` e `npm run prototype:historico`. Eles usam dados de exemplo. O catálogo do desktop usa o MySQL compartilhado após o login. Os antigos exemplos salvos no navegador ou armazenamento local permanecem separados das vendas.
+
+Se o npm indicar que falta o binário do Electron, permita o download oficial e execute `node node_modules/electron/install.js`.
 
 ## Divisão da equipe
 
 | Integrante | Módulo independente | Entrega na integração |
 | --- | --- | --- |
-| Henrique | Backend, banco, usuários, clientes e ViaCEP | Persistência PostgreSQL via Docker, IPC e segurança para todos os módulos |
+| Henrique | Backend, banco, usuários, clientes e ViaCEP | Persistência MySQL, IPC e segurança para todos os módulos |
 | Julia | Produtos, estoque, dólar e dashboard | Catálogo e regra de disponibilidade ao pedido |
 | Nycollas | Entregadores, checkout, frete e distância | Pedido vinculado a cliente, produtos e entregador |
-| Enzo | Itens, recibo, histórico, e-mail e fluxo Git | Itens vinculados ao pedido e confirmação de venda |
+| Enzo | Itens, recibo, histórico e e-mail | Itens vinculados ao pedido e confirmação de venda |
 
 ## Roadmap paralelo
 
 ### Fase 1 - Preparação individual (todos podem começar ao mesmo tempo)
 
-- [ ] **[Henrique]** Criar a base Electron com TypeScript, `main`, `preload` e `renderer`.
-- [ ] **[Henrique]** Configurar scripts de desenvolvimento, build, lint, testes, CSP e `contextIsolation`.
-- [ ] **[Henrique]** Definir contratos TypeScript compartilhados (`ClienteResumo`, `ProdutoResumo`, `PedidoRascunho`) sem implementar telas de terceiros.
-- [ ] **[Henrique]** Configurar PostgreSQL de desenvolvimento via Docker Compose.
-- [ ] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
-- [ ] **[Nycollas]** Criar wireframe e tela estática do caixa/checkout com dados simulados.
-- [ ] **[Enzo]** Criar `develop` branch padrão.
-- [ ] **[Enzo]** Criar modelo visual de recibo e histórico usando dados simulados.
+- [x] **[Henrique]** Criar a base Electron com TypeScript, `main`, `preload` e `renderer`.
+- [x] **[Henrique]** Configurar scripts de desenvolvimento, build, lint, testes, CSP e `contextIsolation`.
+- [x] **[Henrique]** Definir contratos TypeScript compartilhados (`ClienteResumo`, `ProdutoResumo`, `PedidoRascunho`) sem implementar telas de terceiros.
+- [x] **[Henrique]** Configurar credenciais MySQL locais e validar conexão com o servidor da escola.
+- [x] **[Julia]** Criar estrutura visual Bootstrap, navegação e layout-base do dashboard.
+- [x] **[Nycollas]** Criar wireframe e tela estática do caixa/checkout com dados simulados. [Layout do caixa](docs/caixa.png)
+- [x] **[Enzo]** Criar [modelo visual de recibo e histórico](src/renderer/src/modules/historico/prototype/index.html) usando dados simulados.
 
 ### Fase 2 - Módulo do Henrique: backend, banco e clientes
 
-- [ ] **[Henrique]** Criar migrations PostgreSQL para as seis tabelas exigidas.
-- [ ] **[Henrique]** Criar diagrama do banco e documentar as chaves estrangeiras.
-- [ ] **[Henrique]** Implementar classes e repositórios de `Usuario` e `Cliente`.
-- [ ] **[Henrique]** Implementar login, logout, hash de senha e níveis de acesso.
-- [ ] **[Henrique]** Implementar CRUD de clientes com tela própria.
-- [ ] **[Henrique]** Integrar ViaCEP e tratar CEP inválido/falha de rede.
-- [ ] **[Henrique]** Expor APIs IPC tipadas somente para usuários e clientes.
-- [ ] **[Henrique]** Criar seed independente de usuários e clientes.
-- [ ] **[Henrique]** Testar autenticação, permissões, CRUD de clientes e validação de entrada.
+- [x] **[Henrique]** Criar migrations MySQL para as seis tabelas exigidas.
+- [x] **[Henrique]** Criar diagrama do banco e documentar as chaves estrangeiras.
+- [x] **[Henrique]** Implementar classes e repositórios de `Usuario` e `Cliente`.
+- [x] **[Henrique]** Implementar login, logout, hash de senha e níveis de acesso.
+- [x] **[Henrique]** Implementar CRUD de clientes com tela própria.
+- [x] **[Henrique]** Integrar ViaCEP e tratar CEP inválido/falha de rede.
+- [x] **[Henrique]** Expor APIs IPC tipadas somente para usuários e clientes.
+- [x] **[Henrique]** Criar seed independente de usuários e clientes.
+- [x] **[Henrique]** Testar autenticação, permissões, CRUD de clientes e validação de entrada.
 
 ### Fase 3 - Módulo da Julia: produtos e estoque
 
-- [ ] **[Julia]** Criar interface `Produto`, serviço e repositório local/mocado para desenvolvimento isolado.
-- [ ] **[Julia]** Implementar tela e CRUD de produtos com dados de exemplo.
-- [ ] **[Julia]** Implementar categoria, preço em BRL, preço em USD, importado e quantidade em estoque.
-- [ ] **[Julia]** Integrar cotação do dólar com tratamento de falha da API.
-- [ ] **[Julia]** Implementar regra local que identifica produto indisponível quando o estoque for zero.
-- [ ] **[Julia]** Criar dashboard de produtos e indicadores de estoque.
-- [ ] **[Julia]** Criar dados de demonstração e testes do módulo de produtos.
+- [x] **[Julia]** Criar interface `Produto`, serviço e repositório local/mocado para desenvolvimento isolado.
+- [x] **[Julia]** Implementar tela e CRUD de produtos com dados de exemplo.
+- [x] **[Julia]** Implementar categoria, preço em BRL, preço em USD, importado e quantidade em estoque.
+- [x] **[Julia]** Integrar cotação do dólar com tratamento de falha da API.
+- [x] **[Julia]** Implementar regra local que identifica produto indisponível quando o estoque for zero.
+- [x] **[Julia]** Criar dashboard de produtos e indicadores de estoque.
+- [x] **[Julia]** Criar dados de demonstração e testes do módulo de produtos.
 
 ### Fase 4 - Módulo do Nycollas: entregadores, pedido e frete
 
-- [ ] **[Nycollas]** Criar interface `Entregador` e CRUD com dados de exemplo.
-- [ ] **[Nycollas]** Criar `PedidoRascunho` usando IDs e dados simulados de cliente/produto.
-- [ ] **[Nycollas]** Implementar tela de checkout com carrinho local e cálculo de subtotal.
-- [ ] **[Nycollas]** Integrar API de distância usando origem/destino de teste.
-- [ ] **[Nycollas]** Definir e testar regra de cálculo de frete de forma isolada.
-- [ ] **[Nycollas]** Registrar datas de criação/entrega no rascunho do pedido.
-- [ ] **[Nycollas]** Criar testes para total, frete, checkout vazio e falha da API.
+- [x] **[Nycollas]** Criar interface `Entregador` e CRUD com dados de exemplo e MySQL.
+- [x] **[Nycollas]** Criar `PedidoRascunho` usando IDs de cliente e produto.
+- [x] **[Nycollas]** Implementar tela de checkout com carrinho local e cálculo de subtotal.
+- [x] **[Nycollas]** Integrar API de distância com origem configurada e endereço real do cliente.
+- [x] **[Nycollas]** Definir e testar regra de cálculo de frete de forma isolada.
+- [x] **[Nycollas]** Registrar datas de criação e previsão de entrega.
+- [x] **[Nycollas]** Criar testes para total, frete, checkout vazio e falha da API.
 
 ### Fase 5 - Módulo do Enzo: itens, confirmação e histórico
 
-- [ ] **[Enzo]** Criar interface `ItemPedido` e funções de subtotal/total usando dados de exemplo.
-- [ ] **[Enzo]** Garantir que o item preserve preço unitário e quantidade da venda.
-- [ ] **[Enzo]** Criar recibo visual com um pedido simulado.
-- [ ] **[Enzo]** Criar tela de histórico com pedidos simulados.
-- [ ] **[Enzo]** Implementar serviço de e-mail com ambiente de teste ou mock, sem credenciais no código.
-- [ ] **[Enzo]** Tratar falha de envio de e-mail sem invalidar a venda.
-- [ ] **[Enzo]** Revisar PRs e manter o padrão de branches/commits documentado.
+- [x] **[Enzo]** Criar interface `ItemPedido` e funções de subtotal/total usando dados de exemplo.
+- [x] **[Enzo]** Garantir que o item preserve preço unitário e quantidade da venda.
+- [x] **[Enzo]** Criar recibo visual com um pedido simulado.
+- [x] **[Enzo]** Criar tela de histórico com pedidos simulados.
+- [x] **[Enzo]** Implementar serviço de e-mail com ambiente de teste ou mock, sem credenciais no código.
+- [x] **[Enzo]** Tratar falha de envio de e-mail sem invalidar a venda.
+- [x] **[Enzo]** Revisar PRs das funcionalidades da equipe.
 
-### Fase 6 - Integração planejada (somente quando os módulos isolados estiverem prontos)
+## Estado atual da integração
 
-- [ ] **[Henrique]** Criar/adaptar repositórios PostgreSQL para `Produto`, `Entregador`, `Pedido` e `ItemPedido` a partir dos contratos entregues.
-- [ ] **[Julia]** Substituir os dados de exemplo de produtos pela API IPC fornecida por Henrique.
-- [ ] **[Nycollas]** Substituir os dados simulados de cliente, produto e entregador pelas APIs IPC; conectar o checkout ao pedido real.
-- [ ] **[Enzo]** Conectar itens, recibo, histórico e e-mail ao pedido confirmado.
-- [ ] **[Julia]** Conectar a validação de estoque ao fechamento da venda.
-- [ ] **[Nycollas]** Conectar o cálculo de frete/distância ao total final do pedido.
-- [ ] **[Henrique]** Validar transação de venda: gravar pedido, gravar itens e baixar estoque de forma atômica.
-- [ ] **[Todos]** Executar um fluxo integrado: login -> cliente -> produto -> checkout -> frete -> confirmação -> recibo/histórico.
+As funcionalidades abaixo foram reorganizadas para seguir as camadas do projeto e já foram integradas na `develop`.
+
+| Módulo | Pull Request | Situação | Estrutura entregue |
+| --- | --- | --- | --- |
+| Checkout e entregadores | [#7](https://github.com/Coutixx/petshop/pull/7) | Integrado | `src/main/modules/pedidos` e `src/main/modules/entregadores` |
+| Recibos e histórico | [#8](https://github.com/Coutixx/petshop/pull/8) | Integrado | `src/renderer/src/modules/historico` e `src/shared/domain` |
+
+Os PRs originais #5 e #6 foram fechados como substituídos. Não faça merge deles.
+
+### Decisões de integração
+
+O catálogo, o dashboard e o caixa compartilham os produtos do MySQL. O processo principal controla a sessão, a cotação, a rota e a gravação da venda. A lista e o seletor de entregadores usam a resposta da mesma gravação. Um cadastro alterado por outra sessão precisa ser conferido antes de salvar novamente.
+
+### Fase 6 - Integração
+
+- [x] **[Henrique]** Criar/adaptar repositórios MySQL para `Produto`, `Entregador`, `Pedido` e `ItemPedido` a partir dos contratos entregues.
+- [x] **[Julia]** Substituir os dados de exemplo de produtos pela API IPC fornecida por Henrique.
+- [x] **[Nycollas]** Substituir os dados simulados de cliente, produto e entregador pelas APIs IPC; conectar o checkout ao pedido real.
+- [x] **[Enzo]** Conectar itens, recibo, histórico e e-mail ao pedido confirmado.
+- [x] **[Julia]** Conectar a validação de estoque ao fechamento da venda.
+- [x] **[Nycollas]** Conectar o cálculo de frete/distância ao total final do pedido.
+- [x] **[Henrique]** Validar transação de venda: gravar pedido, gravar itens e baixar estoque de forma atômica.
+- [x] **[Todos]** Executar um fluxo integrado: login -> cliente -> produto -> checkout -> frete -> confirmação -> recibo/histórico.
 
 ### Fase 7 - Entrega
 
-- [ ] **[Henrique]** Preparar banco com dados de demonstração e gerar build testável.
-- [ ] **[Julia]** Revisar consistência visual e navegação.
-- [ ] **[Nycollas]** Revisar regras de pedido, frete e mensagens do checkout.
-- [ ] **[Enzo]** Atualizar documentação de instalação, uso e histórico de decisões.
-- [ ] **[Todos]** Revisar segurança, testes, checklist e Pull Requests.
+- [x] **[Henrique]** Preparar banco com dados de demonstração e gerar build testável.
+- [x] **[Julia]** Revisar consistência visual e navegação.
+- [x] **[Nycollas]** Revisar regras de pedido, frete e mensagens do checkout.
+- [x] **[Enzo]** Atualizar documentação de instalação, uso e histórico de decisões.
+- [x] **[Todos]** Revisar segurança, testes, checklist e Pull Requests.
 - [ ] **[Henrique]** Criar a release final na branch `main`.
 
 ## Convenções Git
 
-- [ ] **[Todos]** Trabalhar em uma branch `feature/<nome>-<modulo>` por tarefa.
-- [ ] **[Todos]** Fazer ao menos um commit próprio por checkbox concluído.
-- [ ] **[Todos]** Abrir Pull Request para `develop`; não fazer commit direto em `main` ou `develop`.
-- [ ] **[Enzo]** Garantir que cada PR tenha revisão de pelo menos uma pessoa.
+### Branches
 
-Exemplos:
+- Criar uma branch `feature/<nome>-<modulo>` por tarefa, sempre baseada na `develop` atualizada.
+- Usar o nome do integrante e o módulo em minúsculas, separados por hífen.
+- Exemplo: `feature/enzo-recibo-historico`.
+- Não trabalhar diretamente na `main` ou na `develop`.
+- Não criar arquivos README ou documentos de regras automaticamente ao criar branches.
+
+### Commits
+
+- Fazer ao menos um commit próprio por checkbox concluído.
+- Utilizar `tipo(escopo): descrição` em português.
+- Tipos permitidos incluem `feat`, `fix`, `docs`, `style`, `refactor`, `test` e `chore`.
+- Os commits devem ser realizados na branch específica da tarefa, nunca diretamente na `main` ou `develop`.
+
+### Pull Requests
+
+- Abrir PR da branch de tarefa para `develop`.
+- Descrever no Pull Request as alterações e os testes executados.
+- Solicitar revisão de pelo menos uma pessoa antes do merge.
+- Não realizar merge sem a revisão necessária.
+- Após o merge, sincronizar a `develop` local com o GitHub.
+
+## Sincronização obrigatória com a Develop
+
+A branch `develop` do GitHub (`origin/develop`) é a referência principal de integração do projeto.
+
+Todos os integrantes e agentes devem manter sua cópia local atualizada para evitar trabalhar com código desatualizado ou gerar conflitos desnecessários.
+
+### 1. Ao iniciar o projeto ou uma nova sessão
+
+Sempre que abrir o projeto do zero, iniciar uma nova sessão de desenvolvimento ou começar uma nova tarefa:
+
+1. Verificar a branch atual.
+2. Verificar se existem alterações locais não commitadas.
+3. Atualizar as referências do repositório remoto.
+4. Atualizar a branch `develop` local com a versão do GitHub.
+5. Criar ou atualizar a branch de trabalho a partir da `develop` atualizada.
+
+Comandos de referência:
+
+```bash
+git status
+git fetch origin
+git switch develop
+git pull --ff-only origin develop
+```
+
+Depois, criar a branch da tarefa:
+
+```bash
+git switch -c feature/nome-modulo
+```
+
+Se a branch já existir:
+
+```bash
+git switch feature/nome-modulo
+```
+
+Antes de continuar, verificar se ela precisa incorporar as atualizações mais recentes da `develop`.
+
+### 2. Depois de concluir uma tarefa
+
+O fluxo obrigatório é:
+
+1. Validar a implementação.
+2. Executar os testes necessários.
+3. Criar o commit na branch da tarefa.
+4. Enviar a branch ao GitHub.
+5. Abrir um Pull Request direcionado à `develop`.
+6. Aguardar revisão e integração.
+7. Atualizar a `develop` local após o merge.
+
+Comandos após a integração:
+
+```bash
+git switch develop
+git pull --ff-only origin develop
+```
+
+### 3. Proteção contra perda de alterações
+
+- Nunca executar `git reset --hard` para forçar sincronização.
+- Nunca executar `git clean -fd` sem autorização explícita.
+- Nunca descartar alterações locais sem verificar seu conteúdo.
+- Se houver alterações não commitadas, preservá-las antes de trocar de branch ou sincronizar.
+- Se houver commits locais ainda não enviados, não sobrescrevê-los.
+- Se houver conflitos, interromper a sincronização e resolver os conflitos preservando o trabalho existente.
+- Nunca presumir que um commit local já está disponível no GitHub.
+- Se não houver conexão com o repositório remoto, informar que a sincronização não foi realizada.
+
+### 4. Regras obrigatórias
+
+- A `develop` do GitHub é a referência de integração.
+- Toda tarefa deve começar a partir da versão atualizada da `develop`.
+- Todo trabalho deve ser integrado à `develop` por Pull Request.
+- Não fazer commits diretamente na `develop`.
+- Após cada integração, atualizar a cópia local antes de começar outra tarefa.
+- Não criar READMEs, documentos de regras ou arquivos de instruções automaticamente durante a criação de branches.
+- A sincronização nunca deve apagar ou sobrescrever trabalho de outro integrante.
+
+## Exemplos de commits
 
 ```text
+feat(enzo-recibo): cria modelo visual de recibo
+docs(enzo-git): documenta fluxo de branches e commits
 feat(henrique-clientes): adiciona consulta ViaCEP
 feat(julia-produtos): cria regra de produto indisponivel
 feat(nycollas-checkout): calcula frete do pedido
-feat(enzo-recibo): exibe recibo da venda
 ```
 
-## Critério de pronto para qualquer checkbox
+## Critérios para as próximas tarefas
 
-- [ ] **[Responsável da tarefa]** Código em TypeScript, validado sem erros de compilação.
-- [ ] **[Responsável da tarefa]** Módulo testado com dados próprios ou mock, sem depender de outro módulo.
-- [ ] **[Responsável da tarefa]** Commit criado e checkbox marcado.
-- [ ] **[Revisor do PR]** Pull Request revisado antes do merge em `develop`.
+- **[Responsável da tarefa]** Código em TypeScript, validado sem erros de compilação.
+- **[Responsável da tarefa]** Módulo testado com dados próprios ou mock, sem depender de outro módulo.
+- **[Responsável da tarefa]** Commit criado e checkbox marcado.
+- **[Revisor do PR]** Pull Request revisado antes do merge em `develop`.

@@ -1,0 +1,1 @@
+`ViaCepService` consulta a API ViaCEP no processo Main, aceita CEP com ou sem máscara e impõe timeout de 5 segundos. CEP inválido/inexistente, resposta HTTP inválida, payload incompleto e falha de rede retornam mensagens tratáveis pela UI. A consulta é exposta somente por IPC tipado e requer sessão autenticada.
